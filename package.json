@@ -1,0 +1,38 @@
+{
+  "name": "antigravity-hud",
+  "version": "2.0.0",
+  "description": "Real-time multi-line TUI statusline HUD, live telemetry monitor, and interactive layout configurator for Antigravity AI sessions.",
+  "main": "bin/hud.js",
+  "bin": {
+    "antigravity-hud": "bin/hud.js",
+    "agy-hud": "bin/hud.js",
+    "hud": "bin/hud.js"
+  },
+  "scripts": {
+    "start": "node bin/hud.js",
+    "gui": "node bin/hud.js gui"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aj1126/antigravity-hud.git"
+  },
+  "keywords": [
+    "antigravity",
+    "statusline",
+    "hud",
+    "tui",
+    "developer-tools",
+    "cli",
+    "ai-agent",
+    "gemini"
+  ],
+  "author": "aj1126",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/aj1126/antigravity-hud/issues"
+  },
+  "homepage": "https://github.com/aj1126/antigravity-hud#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

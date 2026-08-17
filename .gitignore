@@ -1,0 +1,18 @@
+﻿# Dependencies
+node_modules/
+package-lock.json
+
+# Runtime and Local Caches
+tmp/
+*.log
+last_*.json
+sessions/
+fork_snooze.json
+*.db
+*.db-journal
+
+# Editor and OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

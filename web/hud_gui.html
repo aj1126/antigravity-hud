@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Antigravity HUD Configurator</title>
+  <style>
+    :root {
+      --bg-primary: #12141a;
+      --bg-secondary: #1a1d26;
+      --bg-card: #222634;
+      --bg-card-hover: #2a2f40;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --success: #10b981;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      --border: #2d3345;
+      --border-focus: #4b5563;
+      --terminal-bg: #090a0f;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background-color: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .header-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-title h1 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .header-badge {
+      font-size: 0.75rem;
+      background-color: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      cursor: pointer;
+      border: 1px solid transparent;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-primary {
+      background-color: var(--accent);
+      color: #ffffff;
+    }
+    .btn-primary:hover {
+      background-color: var(--accent-hover);
+    }
+
+    .btn-secondary {
+      background-color: var(--bg-card);
+      color: var(--text-main);
+      border-color: var(--border);
+    }
+    .btn-secondary:hover {
+      background-color: var(--bg-card-hover);
+      border-color: var(--border-focus);
+    }
+
+    .btn-danger {
+      background-color: rgba(239, 68, 68, 0.1);
+      color: #f87171;
+      border-color: rgba(239, 68, 68, 0.2);
+    }
+    .btn-danger:hover {
+      background-color: rgba(239, 68, 68, 0.2);
+    }
+
+    main {
+      flex: 1;
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Live Preview Panel */
+    .preview-section {
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .preview-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .preview-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .preview-box {
+      background-color: var(--terminal-bg);
+      border: 1px solid #1f2430;
+      border-radius: 6px;
+      padding: 14px 16px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.875rem;
+      line-height: 1.6;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      overflow-x: auto;
+    }
+
+    .terminal-line {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      min-height: 24px;
+    }
+
+    .term-ws { color: #60a5fa; font-weight: 600; }
+    .term-branch { color: #c084fc; }
+    .term-git { color: #34d399; font-weight: 600; }
+    .term-model { color: #22d3ee; font-weight: 600; }
+    .term-effort { color: #9ca3af; }
+    .term-state { color: #34d399; font-weight: 600; }
+    .term-auth { color: #9ca3af; }
+    .term-sandbox { color: #34d399; }
+    .term-session { color: #9ca3af; }
+    .term-ctx { color: #38bdf8; }
+    .term-bar { color: #60a5fa; }
+    .term-cache { color: #9ca3af; }
+    .term-fork { color: #fbbf24; font-weight: 600; }
+    .term-quota { color: #fbbf24; }
+    .term-wk { color: #34d399; }
+    .term-mcp { color: #fb923c; }
+    .term-subagent { color: #22d3ee; }
+    .term-task { color: #fbbf24; }
+    .term-artifact { color: #f59e0b; }
+    .term-queue { color: #22d3ee; }
+    .term-sep { color: #4b5563; }
+
+    /* Controls Bar */
+    .controls-bar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+    }
+
+    .control-label {
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    select, input[type="text"] {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      outline: none;
+    }
+    select:focus, input[type="text"]:focus {
+      border-color: var(--accent);
+    }
+
+    /* Layout Editor Columns */
+    .columns-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+    }
+
+    .column {
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-height: 320px;
+    }
+
+    .column.inactive {
+      opacity: 0.5;
+      background-color: rgba(26, 29, 38, 0.4);
+    }
+
+    .column-header {
+      padding: 12px 14px;
+      background-color: rgba(255, 255, 255, 0.02);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .column-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .column-count {
+      font-size: 0.75rem;
+      background-color: var(--bg-card);
+      color: var(--text-muted);
+      padding: 2px 6px;
+      border-radius: 10px;
+    }
+
+    .items-container {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 200px;
+      flex: 1;
+    }
+
+    .items-container.drag-over {
+      background-color: rgba(59, 130, 246, 0.05);
+      outline: 2px dashed rgba(59, 130, 246, 0.4);
+      outline-offset: -4px;
+    }
+
+    /* Draggable Item Card */
+    .hud-card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      cursor: grab;
+      user-select: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: transform 0.1s ease, border-color 0.15s ease, background-color 0.15s ease;
+    }
+
+    .hud-card:hover {
+      background-color: var(--bg-card-hover);
+      border-color: var(--border-focus);
+    }
+
+    .hud-card.dragging {
+      opacity: 0.4;
+      transform: scale(0.98);
+    }
+
+    .card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-title {
+      font-size: 0.825rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .card-desc {
+      font-size: 0.725rem;
+      color: var(--text-muted);
+    }
+
+    .card-style-select {
+      font-size: 0.725rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      align-self: flex-start;
+    }
+
+    /* Toast Notification */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background-color: var(--success);
+      color: #ffffff;
+      padding: 10px 18px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.2s ease;
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    #toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-title">
+      <h1>Antigravity HUD Configurator</h1>
+      <span class="header-badge">v2.0.0</span>
+    </div>
+    <div class="header-actions">
+      <button class="btn-secondary" id="btnReset" onclick="resetToDefaults()">Reset Defaults</button>
+      <button class="btn-primary" id="btnSave" onclick="saveConfiguration()">Save Changes</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Live Preview -->
+    <section class="preview-section">
+      <div class="preview-header">
+        <div class="preview-title">
+          <span>🖥️ Live Terminal Statusline Preview</span>
+        </div>
+        <span class="card-desc">Simulated preview reflecting active lines and item format styles</span>
+      </div>
+      <div class="preview-box" id="previewContainer">
+        <!-- Generated Dynamically -->
+      </div>
+    </section>
+
+    <!-- Global Controls -->
+    <section class="controls-bar">
+      <div class="control-group">
+        <label class="control-label" for="selectLines">Display Lines:</label>
+        <select id="selectLines" onchange="onLineCountChange()">
+          <option value="1">1 Line (Single Line)</option>
+          <option value="2">2 Lines (Standard Dual-Line)</option>
+          <option value="3">3 Lines (High Density)</option>
+          <option value="4">4 Lines (Maximum Detail)</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label class="control-label" for="selectCompact">Global Compact Mode:</label>
+        <select id="selectCompact" onchange="onCompactChange()">
+          <option value="auto">Auto (Adapts to Terminal Width)</option>
+          <option value="full">Full (Standard Detailed Text)</option>
+          <option value="short">Short (Abbreviated Labels)</option>
+          <option value="minimal">Minimal (Icons & Numbers Only)</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label class="control-label" for="inputSeparator">Separator:</label>
+        <input type="text" id="inputSeparator" value="│" style="width: 50px; text-align: center;" oninput="updatePreview()" />
+      </div>
+    </section>
+
+    <!-- 4-Line Drag-and-Drop Columns -->
+    <section class="columns-grid">
+      <!-- Line 1 -->
+      <div class="column" id="colLine1">
+        <div class="column-header">
+          <span class="column-title">📌 Line 1 <span class="column-count" id="countLine1">0</span></span>
+        </div>
+        <div class="items-container" id="containerLine1" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event, 'line1')"></div>
+      </div>
+
+      <!-- Line 2 -->
+      <div class="column" id="colLine2">
+        <div class="column-header">
+          <span class="column-title">📌 Line 2 <span class="column-count" id="countLine2">0</span></span>
+        </div>
+        <div class="items-container" id="containerLine2" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event, 'line2')"></div>
+      </div>
+
+      <!-- Line 3 -->
+      <div class="column" id="colLine3">
+        <div class="column-header">
+          <span class="column-title">📌 Line 3 <span class="column-count" id="countLine3">0</span></span>
+        </div>
+        <div class="items-container" id="containerLine3" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event, 'line3')"></div>
+      </div>
+
+      <!-- Line 4 -->
+      <div class="column" id="colLine4">
+        <div class="column-header">
+          <span class="column-title">📌 Line 4 <span class="column-count" id="countLine4">0</span></span>
+        </div>
+        <div class="items-container" id="containerLine4" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event, 'line4')"></div>
+      </div>
+
+      <!-- Available / Disabled Pool -->
+      <div class="column" id="colDisabled">
+        <div class="column-header">
+          <span class="column-title">🚫 Inactive Pool <span class="column-count" id="countDisabled">0</span></span>
+        </div>
+        <div class="items-container" id="containerDisabled" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event, 'disabled')"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast">✔ Configuration saved successfully!</div>
+
+  <script>
+    const ITEM_METADATA = {
+      workspace: { label: '📁 Workspace', desc: 'Directory name & git branch' },
+      git_status: { label: '🌿 Git Status', desc: 'Working tree Clean / Dirty indicators' },
+      model: { label: '🤖 AI Model', desc: 'Model name & [🧠 HIGH] effort badge' },
+      state: { label: '⚡ Agent State', desc: 'Lifecycle state [IDLE] / [WORKING]' },
+      auth: { label: '🔑 Auth Type', desc: 'Authentication provider badge' },
+      sandbox: { label: '🛡️ Sandbox', desc: 'Container sandbox security status' },
+      session: { label: '⏱️ Session Uptime', desc: 'Live session duration & color timer' },
+      context: { label: '📊 Context Window', desc: 'Progress bar, token count & cache rate' },
+      fork: { label: '🍴 Fork Advisory', desc: 'Clean-state milestone /fork advisor' },
+      quota_5h: { label: '⏳ 5h Quota', desc: '5-hour reserve % & reset countdown' },
+      quota_weekly: { label: '📅 Weekly Quota', desc: 'Weekly quota reserve percentage' },
+      mcp: { label: '🔌 MCP Servers', desc: 'Connected MCP tool count' },
+      subagents: { label: '🤖 Subagents', desc: 'Active background subagent workers' },
+      tasks: { label: '⚙️ Tasks', desc: 'Running background processes' },
+      artifacts: { label: '📝 Artifacts', desc: 'Persisted brain artifact documents' },
+      queue: { label: '⏳ Queued Messages', desc: 'Queued user turns & background inputs' }
+    };
+
+    let activeConfig = {
+      lines: 2,
+      two_line: true,
+      separator: '│',
+      compact_mode: 'auto',
+      line1: ['workspace', 'git_status', 'model', 'state', 'auth', 'sandbox', 'session'],
+      line2: ['context', 'fork', 'quota_5h', 'quota_weekly', 'mcp', 'subagents', 'tasks', 'artifacts', 'queue'],
+      line3: [],
+      line4: [],
+      disabled: [],
+      item_styles: {}
+    };
+
+    let draggedItemKey = null;
+
+    async function init() {
+      try {
+        const res = await fetch('/api/config');
+        if (res.ok) {
+          activeConfig = await res.json();
+        }
+      } catch (_) {}
+
+      document.getElementById('selectLines').value = String(activeConfig.lines || (activeConfig.two_line ? 2 : 1));
+      document.getElementById('selectCompact').value = activeConfig.compact_mode || 'auto';
+      document.getElementById('inputSeparator').value = activeConfig.separator || '│';
+
+      renderAllColumns();
+      updatePreview();
+    }
+
+    function renderAllColumns() {
+      const lineCount = parseInt(document.getElementById('selectLines').value, 10) || 2;
+
+      for (let l = 1; l <= 4; l++) {
+        const col = document.getElementById(`colLine${l}`);
+        if (l <= lineCount) {
+          col.classList.remove('inactive');
+        } else {
+          col.classList.add('inactive');
+        }
+      }
+
+      renderColumn('containerLine1', activeConfig.line1 || [], 'countLine1');
+      renderColumn('containerLine2', activeConfig.line2 || [], 'countLine2');
+      renderColumn('containerLine3', activeConfig.line3 || [], 'countLine3');
+      renderColumn('containerLine4', activeConfig.line4 || [], 'countLine4');
+
+      const allActive = [
+        ...(activeConfig.line1 || []),
+        ...(activeConfig.line2 || []),
+        ...(activeConfig.line3 || []),
+        ...(activeConfig.line4 || [])
+      ];
+
+      const disabledList = Object.keys(ITEM_METADATA).filter(k => !allActive.includes(k));
+      renderColumn('containerDisabled', disabledList, 'countDisabled');
+    }
+
+    function renderColumn(containerId, items, countId) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = '';
+      document.getElementById(countId).textContent = items.length;
+
+      items.forEach(key => {
+        const meta = ITEM_METADATA[key] || { label: key, desc: '' };
+        const card = document.createElement('div');
+        card.className = 'hud-card';
+        card.draggable = true;
+        card.dataset.key = key;
+
+        card.ondragstart = (e) => {
+          draggedItemKey = key;
+          card.classList.add('dragging');
+          e.dataTransfer.setData('text/plain', key);
+        };
+
+        card.ondragend = () => {
+          card.classList.remove('dragging');
+          draggedItemKey = null;
+          document.querySelectorAll('.items-container').forEach(el => el.classList.remove('drag-over'));
+        };
+
+        const currentStyle = activeConfig.item_styles?.[key] || 'auto';
+
+        card.innerHTML = `
+          <div class="card-top">
+            <span class="card-title">${meta.label}</span>
+            <select class="card-style-select" onchange="onItemStyleChange('${key}', this.value)" onclick="event.stopPropagation()">
+              <option value="auto" ${currentStyle === 'auto' ? 'selected' : ''}>Auto</option>
+              <option value="full" ${currentStyle === 'full' ? 'selected' : ''}>Full</option>
+              <option value="short" ${currentStyle === 'short' ? 'selected' : ''}>Short</option>
+              <option value="minimal" ${currentStyle === 'minimal' ? 'selected' : ''}>Minimal</option>
+            </select>
+          </div>
+          <span class="card-desc">${meta.desc}</span>
+        `;
+
+        container.appendChild(card);
+      });
+    }
+
+    function onItemStyleChange(key, style) {
+      if (!activeConfig.item_styles) activeConfig.item_styles = {};
+      if (style === 'auto') {
+        delete activeConfig.item_styles[key];
+      } else {
+        activeConfig.item_styles[key] = style;
+      }
+      updatePreview();
+    }
+
+    function onDragOver(e) {
+      e.preventDefault();
+      e.currentTarget.classList.add('drag-over');
+    }
+
+    function onDragLeave(e) {
+      e.currentTarget.classList.remove('drag-over');
+    }
+
+    function onDrop(e, targetCol) {
+      e.preventDefault();
+      e.currentTarget.classList.remove('drag-over');
+      if (!draggedItemKey) return;
+
+      ['line1', 'line2', 'line3', 'line4'].forEach(col => {
+        if (Array.isArray(activeConfig[col])) {
+          activeConfig[col] = activeConfig[col].filter(k => k !== draggedItemKey);
+        }
+      });
+      activeConfig.disabled = (activeConfig.disabled || []).filter(k => k !== draggedItemKey);
+
+      if (targetCol === 'disabled') {
+        if (!activeConfig.disabled.includes(draggedItemKey)) {
+          activeConfig.disabled.push(draggedItemKey);
+        }
+      } else {
+        if (!Array.isArray(activeConfig[targetCol])) activeConfig[targetCol] = [];
+        activeConfig[targetCol].push(draggedItemKey);
+      }
+
+      renderAllColumns();
+      updatePreview();
+    }
+
+    function onLineCountChange() {
+      const val = parseInt(document.getElementById('selectLines').value, 10);
+      activeConfig.lines = val;
+      activeConfig.two_line = val >= 2;
+      renderAllColumns();
+      updatePreview();
+    }
+
+    function onCompactChange() {
+      activeConfig.compact_mode = document.getElementById('selectCompact').value;
+      updatePreview();
+    }
+
+    function getSampleItemText(key) {
+      const st = activeConfig.item_styles?.[key] || activeConfig.compact_mode || 'full';
+
+      switch (key) {
+        case 'workspace':
+          if (st === 'minimal') return '<span class="term-ws">📁 PP4xDOTCore</span>';
+          if (st === 'short') return '<span class="term-ws">📁 PP4xDOTCore</span> <span class="term-branch">(main*)</span>';
+          return '<span class="term-ws">📁 PP4xDOTCore</span> <span class="term-branch">(⎇ main * ↑1)</span>';
+        case 'git_status':
+          if (st === 'minimal') return '<span class="term-git">🌿</span>';
+          return '<span class="term-git">🌿 Clean</span>';
+        case 'model':
+          if (st === 'minimal') return '<span class="term-model">Flash</span>';
+          if (st === 'short') return '<span class="term-model">Gemini Flash [HIGH]</span>';
+          return '<span class="term-model">Gemini 3.7 Flash</span> <span class="term-effort">[🧠 HIGH]</span>';
+        case 'state':
+          if (st === 'minimal') return '<span class="term-state">●</span>';
+          if (st === 'short') return '<span class="term-state">[WRK]</span>';
+          return '<span class="term-state">[WORKING]</span>';
+        case 'auth':
+          if (st === 'minimal') return '<span class="term-auth">🔑</span>';
+          return '<span class="term-auth">🔑 API-Key</span>';
+        case 'sandbox':
+          if (st === 'minimal') return '<span class="term-sandbox">🛡️</span>';
+          return '<span class="term-sandbox">🛡️ Sandbox</span>';
+        case 'session':
+          if (st === 'minimal') return '<span class="term-session">⏱️ 84m</span>';
+          if (st === 'short') return '<span class="term-session">⏱️ 1h 24m</span>';
+          return '<span class="term-session">⏱️ 1h 24m 15s</span>';
+        case 'context':
+          if (st === 'minimal') return '<span class="term-ctx">Ctx: 22%</span>';
+          if (st === 'short') return '<span class="term-ctx">Ctx: <span class="term-bar">██░░</span> 22% <span class="term-cache">(⚡ 93%)</span></span>';
+          return '<span class="term-ctx">Ctx: <span class="term-bar">██░░░░░░░░</span> 22% (229k tok) <span class="term-cache">(⚡ 93% Cache)</span></span>';
+        case 'fork':
+          if (st === 'minimal') return '<span class="term-fork">🍴 /fork</span>';
+          if (st === 'short') return '<span class="term-fork">🍴 /fork (65%)</span>';
+          return '<span class="term-fork">🍴 Milestone: consider /fork (65% • 350s)</span>';
+        case 'quota_5h':
+          if (st === 'minimal') return '<span class="term-quota">5h: 53%</span>';
+          if (st === 'short') return '<span class="term-quota">5h: 53% (3.5h)</span>';
+          return '<span class="term-quota">Quota: 53% (↻ 3h 34m)</span>';
+        case 'quota_weekly':
+          return '<span class="term-wk">Wk: 27%</span>';
+        case 'mcp':
+          return '<span class="term-mcp">🔌 15 MCP</span>';
+        case 'subagents':
+          return '<span class="term-subagent">🤖 1 subagent</span>';
+        case 'tasks':
+          return '<span class="term-task">⚙️ 2 tasks</span>';
+        case 'artifacts':
+          return '<span class="term-artifact">📝 7</span>';
+        case 'queue':
+          return '<span class="term-queue">⏳ 2 queued</span>';
+        default:
+          return key;
+      }
+    }
+
+    function updatePreview() {
+      const sep = document.getElementById('inputSeparator').value || '│';
+      const sepElem = `<span class="term-sep"> ${sep} </span>`;
+      const numLines = parseInt(document.getElementById('selectLines').value, 10) || 2;
+      const previewBox = document.getElementById('previewContainer');
+      previewBox.innerHTML = '';
+
+      for (let l = 1; l <= numLines; l++) {
+        const items = activeConfig[`line${l}`] || [];
+        const lineElem = document.createElement('div');
+        lineElem.className = 'terminal-line';
+
+        const rendered = items.map(k => getSampleItemText(k)).filter(Boolean);
+        if (rendered.length === 0) {
+          lineElem.innerHTML = '<span style="color:#4b5563;">(empty line)</span>';
+        } else {
+          lineElem.innerHTML = rendered.join(sepElem);
+        }
+        previewBox.appendChild(lineElem);
+      }
+    }
+
+    async function saveConfiguration() {
+      activeConfig.lines = parseInt(document.getElementById('selectLines').value, 10);
+      activeConfig.two_line = activeConfig.lines >= 2;
+      activeConfig.compact_mode = document.getElementById('selectCompact').value;
+      activeConfig.separator = document.getElementById('inputSeparator').value || '│';
+
+      try {
+        const res = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(activeConfig)
+        });
+
+        if (res.ok) {
+          const toast = document.getElementById('toast');
+          toast.classList.add('show');
+          setTimeout(() => toast.classList.remove('show'), 3000);
+        } else {
+          alert('Failed to save configuration.');
+        }
+      } catch (e) {
+        alert('Error saving configuration: ' + e.message);
+      }
+    }
+
+    function resetToDefaults() {
+      if (confirm('Reset HUD layout and styles to default settings?')) {
+        activeConfig = {
+          lines: 2,
+          two_line: true,
+          separator: '│',
+          compact_mode: 'auto',
+          line1: ['workspace', 'git_status', 'model', 'state', 'auth', 'sandbox', 'session'],
+          line2: ['context', 'fork', 'quota_5h', 'quota_weekly', 'mcp', 'subagents', 'tasks', 'artifacts', 'queue'],
+          line3: [],
+          line4: [],
+          disabled: [],
+          item_styles: {}
+        };
+        document.getElementById('selectLines').value = "2";
+        document.getElementById('selectCompact').value = "auto";
+        document.getElementById('inputSeparator').value = "│";
+        renderAllColumns();
+        updatePreview();
+      }
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>
