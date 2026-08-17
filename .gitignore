@@ -1,6 +1,10 @@
-﻿# Dependencies
+# Dependencies
 node_modules/
 package-lock.json
+
+# Whitelist tracked bin directory
+!bin/
+!bin/**
 
 # Runtime and Local Caches
 tmp/
