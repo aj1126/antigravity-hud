@@ -6,6 +6,20 @@
 
 ---
 
+### [SESSION LOG: 2026-08-18 (Part 5 - StatusLine Command Formatting Invariant & Active ~/.gemini/scripts/ Restoration)]
+* **Completed Objectives:**
+  - Resolved statusline subprocess resolution error caused by nested escaped quotes in `settings.json` on Windows.
+  - Codified **Statusline Subprocess Command Formatting Invariant**: `settings.json` `statusLine.command` must never contain nested escaped quotes (`\"`), enforcing clean unquoted absolute paths (`node C:/Users/<user>/.gemini/scripts/hud.js`).
+  - Codified **Active Scripts Directory Invariant**: established `~/.gemini/scripts/` (`hud.js`, `hud_config.json`, `hud_gui.ps1`, `hud_gui.html`) as real physical files (non-symlinks) with top priority in config resolvers.
+  - Hardened [`install.ps1`](file:///B:/Repos/antigravity-hud/install.ps1), [`bin/hud.js`](file:///B:/Repos/antigravity-hud/bin/hud.js), and integration tests to automatically enforce unquoted statusLine commands.
+  - Persisted Sections 7 & 8 into [`~/.gemini/antigravity/knowledge/runtime_drift_and_self_healing_protocol.md`](file:///C:/Users/ajjuk/.gemini/antigravity/knowledge/runtime_drift_and_self_healing_protocol.md).
+
+* **Validation Status:**
+  - Master test matrix (5 suites, 31 assertions) 100% PASS.
+  - Live HUD statusline verified 100% online and operational.
+
+---
+
 ### [SESSION LOG: 2026-08-18 (Part 4 - Agent Skill Governance, Vendor Protection Standard & Multi-Scope Skill Auditor)]
 * **Completed Objectives:**
   - Codified the universal **Agent Skill Governance Standard** (`~/.gemini/antigravity/knowledge/agent_skill_governance.md`).
