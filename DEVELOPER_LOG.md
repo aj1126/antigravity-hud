@@ -16,7 +16,8 @@
   - Created working branch `audit-agy-skills` in `antigravity-hud`.
 
 * **Files Modified / Created:**
-  - `~/.gemini/antigravity/knowledge/agent_skill_governance.md` — central governance rule
+  - `~/.gemini/antigravity/knowledge/agent_skill_governance.md` — central skill governance standard
+  - `~/.gemini/antigravity/knowledge/runtime_drift_and_self_healing_protocol.md` — central runtime drift & self-healing protocol
   - `~/.gemini/config/skills/audit-agy-skills/scripts/Audit-AgySkills.ps1` — multi-scope category-aware auditor
   - `~/.gemini/config/skills/audit-agy-skills/SKILL.md` — scope selection router
   - `~/.gemini/config/skills/audit-agy-skills/resources/progressive_disclosure_guide.md` — progressive disclosure architecture guide
