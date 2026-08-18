@@ -72,16 +72,18 @@ function getConfigPath() {
   if (process.env.HUD_CONFIG_PATH && fs.existsSync(process.env.HUD_CONFIG_PATH)) {
     return process.env.HUD_CONFIG_PATH;
   }
+  const scriptsPath = path.join(homeDir, '.gemini', 'scripts', 'hud_config.json');
   const dedicatedPath = path.join(homeDir, '.gemini', 'hud', 'hud_config.json');
   const legacyRootPath = path.join(homeDir, '.gemini', 'hud_config.json');
   const siblingPath = path.join(__dirname, 'hud_config.json');
   const parentPath = path.join(__dirname, '..', 'hud_config.json');
 
+  if (fs.existsSync(scriptsPath)) return scriptsPath;
   if (fs.existsSync(dedicatedPath)) return dedicatedPath;
   if (fs.existsSync(legacyRootPath)) return legacyRootPath;
   if (fs.existsSync(siblingPath)) return siblingPath;
   if (fs.existsSync(parentPath)) return parentPath;
-  return dedicatedPath;
+  return scriptsPath;
 }
 
 function loadConfig() {
@@ -484,7 +486,7 @@ function performHealthCheck(repair = false) {
         const raw = fs.readFileSync(settingsPath, 'utf8');
         const st = JSON.parse(raw);
         if (!st.statusLine) st.statusLine = {};
-        const bestTarget = path.join(hudDir, 'hud.js').replace(/\\/g, '/');
+        const bestTarget = (fs.existsSync(path.join(scriptsDir, 'hud.js')) ? path.join(scriptsDir, 'hud.js') : path.join(hudDir, 'hud.js')).replace(/\\/g, '/');
         st.statusLine.command = `node ${bestTarget}`;
         st.statusLine.enabled = true;
         st.statusLine.type = 'command';

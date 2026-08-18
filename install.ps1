@@ -9,7 +9,7 @@ param (
 $ErrorActionPreference = 'Stop'
 
 Write-Host "=======================================================" -ForegroundColor Cyan
-Write-Host "         Antigravity HUD Installer (v2.2.0)            " -ForegroundColor Cyan
+Write-Host "         Antigravity HUD Installer (v2.3.0)            " -ForegroundColor Cyan
 Write-Host "=======================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -32,7 +32,7 @@ Write-Host "[1/3] Deploying HUD engine, WinForms configurator & Web GUI..." -For
 Copy-Item (Join-Path $RepoRoot "bin\hud.js") (Join-Path $ScriptsDir "hud.js") -Force
 Copy-Item (Join-Path $RepoRoot "bin\hud_gui.ps1") (Join-Path $ScriptsDir "hud_gui.ps1") -Force
 Copy-Item (Join-Path $RepoRoot "web\hud_gui.html") (Join-Path $ScriptsDir "hud_gui.html") -Force
-Write-Host "  ✔ Deployed runtime scripts to $ScriptsDir" -ForegroundColor Green
+Write-Host "  [OK] Deployed runtime scripts to $ScriptsDir" -ForegroundColor Green
 
 # Copy to dedicated ~/.gemini/hud/
 Copy-Item (Join-Path $RepoRoot "bin\hud.js") (Join-Path $HudDir "hud.js") -Force
@@ -41,9 +41,9 @@ Copy-Item (Join-Path $RepoRoot "web\hud_gui.html") (Join-Path $HudDir "hud_gui.h
 $HudConfigDest = Join-Path $HudDir "hud_config.json"
 if (-not (Test-Path $HudConfigDest)) {
     Copy-Item (Join-Path $RepoRoot "bin\hud_config.json") $HudConfigDest -Force
-    Write-Host "  ✔ Initialized default configuration in $HudDir" -ForegroundColor Green
+    Write-Host "  [OK] Initialized default configuration in $HudDir" -ForegroundColor Green
 }
-Write-Host "  ✔ Deployed subsystem components to $HudDir" -ForegroundColor Green
+Write-Host "  [OK] Deployed subsystem components to $HudDir" -ForegroundColor Green
 
 Write-Host "[2/3] Configuring Antigravity settings..." -ForegroundColor Yellow
 $SettingsCandidates = @(
@@ -55,16 +55,16 @@ $ConfiguredCount = 0
 foreach ($SettingsFile in $SettingsCandidates) {
     if (Test-Path $SettingsFile) {
         try {
-            $Content = Get-Content $SettingsFile -Raw -Encoding UTF8
+            $Content = [System.IO.File]::ReadAllText($SettingsFile)
             $Settings = $Content | ConvertFrom-Json
             
             if (-not $Settings.statusLine) {
                 $Settings | Add-Member -MemberType NoteProperty -Name "statusLine" -Value ([PSCustomObject]@{}) -Force
             }
 
-            $ScriptPath = Join-Path $HudDir "hud.js"
+            $ScriptPath = Join-Path $ScriptsDir "hud.js"
             $NormalizedScriptPath = $ScriptPath.Replace('\', '/')
-            $CommandString = "node `"$NormalizedScriptPath`""
+            $CommandString = "node $NormalizedScriptPath"
 
             $Settings.statusLine | Add-Member -MemberType NoteProperty -Name "type" -Value "command" -Force
             $Settings.statusLine | Add-Member -MemberType NoteProperty -Name "command" -Value $CommandString -Force
@@ -75,29 +75,30 @@ foreach ($SettingsFile in $SettingsCandidates) {
 
             $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
             [System.IO.File]::WriteAllText($SettingsFile, ($Settings | ConvertTo-Json -Depth 20), $Utf8NoBom)
-            Write-Host "  ✔ Updated statusLine hook in: $SettingsFile" -ForegroundColor Green
+            Write-Host "  [OK] Updated statusLine hook in: $SettingsFile" -ForegroundColor Green
             $ConfiguredCount++
         } catch {
-            Write-Warning "Failed to update $SettingsFile`: $_"
+            Write-Warning ("Failed to update {0}: {1}" -f $SettingsFile, $_.Exception.Message)
         }
     }
 }
 
 Write-Host "[3/3] Verifying installation & health parity..." -ForegroundColor Yellow
 try {
-    $TestOutput = & node (Join-Path $HudDir "hud.js") check
-    Write-Host "  ✔ Antigravity HUD CLI is 100% functional, synchronized, and ready!" -ForegroundColor Green
+    $TestOutput = & node (Join-Path $ScriptsDir "hud.js") check
+    Write-Host "  [OK] Antigravity HUD CLI is 100% functional, synchronized, and ready!" -ForegroundColor Green
 } catch {
-    Write-Warning "Could not verify CLI execution: $_"
+    Write-Warning ("Could not verify CLI execution: {0}" -f $_.Exception.Message)
 }
 
 Write-Host ""
 Write-Host "=======================================================" -ForegroundColor Cyan
-Write-Host "✔ Antigravity HUD installation completed successfully! " -ForegroundColor Green
+Write-Host "        Antigravity HUD Installation Complete!         " -ForegroundColor Green
 Write-Host "=======================================================" -ForegroundColor Cyan
-Write-Host "Quick Tips:"
-Write-Host "  • Run `hud` or `agy-hud` to view the live statusline readout"
-Write-Host "  • Run `hud gui` or `hud-gui` to open the WinForms Configurator"
-Write-Host "  • Run `hud check` to verify runtime integrity and zero drift"
-Write-Host "  • Run `hud repair` to trigger self-healing auto-repair"
-Write-Host "  • Run `hud help` for full CLI commands reference"
+Write-Host ""
+Write-Host "Next Steps:"
+Write-Host "  - Run 'hud' to preview your live multi-line statusline readout"
+Write-Host "  - Run 'hud gui' or 'hud-gui' to open the WinForms Configurator"
+Write-Host "  - Run 'hud check' to verify runtime integrity and zero drift"
+Write-Host "  - Run 'hud repair' to trigger self-healing auto-repair"
+Write-Host "  - Run 'hud help' for full CLI commands reference"

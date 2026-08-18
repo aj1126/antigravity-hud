@@ -31,11 +31,18 @@ runTest('Settings: settings.json statusLine object exists and is enabled', () =>
   assert.strictEqual(parsed.statusLine.enabled, true, 'statusLine must be enabled');
 });
 
-// 2. Command points to relocated ~/.gemini/hud/hud.js
-runTest('Settings: statusLine.command points to dedicated ~/.gemini/hud/hud.js', () => {
+// 2. Command points to valid active hud.js without quotes
+runTest('Settings: statusLine.command points to valid active hud.js without quotes', () => {
   const parsed = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
   const cmd = parsed.statusLine.command;
-  assert(cmd.includes('.gemini/hud/hud.js') || cmd.includes('.gemini\\hud\\hud.js'), `Command must reference ~/.gemini/hud/hud.js, got: ${cmd}`);
+  assert(
+    cmd.includes('.gemini/scripts/hud.js') || 
+    cmd.includes('.gemini\\scripts\\hud.js') || 
+    cmd.includes('.gemini/hud/hud.js') || 
+    cmd.includes('.gemini\\hud\\hud.js'), 
+    `Command must reference valid active hud.js, got: ${cmd}`
+  );
+  assert(!cmd.includes('\"') && !cmd.includes('"'), `Command must not contain literal quote characters, got: ${cmd}`);
 });
 
 console.log(`\nResults: ${passed} / ${total} tests passed.\n`);
