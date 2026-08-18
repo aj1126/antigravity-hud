@@ -1,0 +1,44 @@
+{
+  "conversation_id": "test-session-fixture-uuid",
+  "session_id": "test-session-fixture-uuid",
+  "cwd": "B:\\Repos\\antigravity-hud",
+  "model": {
+    "display_name": "Gemini 3.7 Flash",
+    "thinking_budget": 8000,
+    "reasoning_effort": "high"
+  },
+  "status": "idle",
+  "auth": {
+    "provider": "gemini-api-key"
+  },
+  "sandbox": {
+    "enabled": true
+  },
+  "session_start_time": "2026-08-18T00:00:00Z",
+  "session_duration_seconds": 1845,
+  "context_window": {
+    "used_percentage": 42.5,
+    "total_input_tokens": 425000,
+    "cached_input_tokens": 289000,
+    "prompt_cache_hit_rate": 0.68
+  },
+  "quota": {
+    "five_hour_percent": 78,
+    "five_hour_reset_seconds": 9420,
+    "weekly_percent": 91
+  },
+  "mcp_servers": [
+    { "name": "filesystem", "status": "running" },
+    { "name": "duckdb", "status": "running" },
+    { "name": "github", "status": "running" }
+  ],
+  "tasks": [
+    { "id": "task-1", "state": "running" }
+  ],
+  "subagents": [
+    { "id": "sub-1", "state": "running" },
+    { "id": "sub-2", "state": "idle" }
+  ],
+  "artifact_count": 5,
+  "queue_count": 2
+}
