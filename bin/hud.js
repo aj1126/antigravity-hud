@@ -139,12 +139,20 @@ function loadConfig() {
 
 function saveConfig(cfg) {
   let target = getConfigPath();
-  if (!fs.existsSync(target)) {
-    target = path.join(homeDir, '.gemini', 'hud', 'hud_config.json');
+  if (!target || !fs.existsSync(target)) {
+    target = path.join(homeDir, '.gemini', 'scripts', 'hud_config.json');
   }
   const dir = path.dirname(target);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(target, JSON.stringify(cfg, null, 2), 'utf8');
+
+  // Dual-sync to ~/.gemini/hud/hud_config.json if directory exists
+  const hudMirror = path.join(homeDir, '.gemini', 'hud', 'hud_config.json');
+  if (target !== hudMirror && fs.existsSync(path.dirname(hudMirror))) {
+    try {
+      fs.writeFileSync(hudMirror, JSON.stringify(cfg, null, 2), 'utf8');
+    } catch (_) {}
+  }
 }
 
 function resolveItemStyle(itemKey, cfg, terminalWidth) {
