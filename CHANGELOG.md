@@ -4,6 +4,28 @@ All notable changes to **Antigravity HUD** (`antigravity-hud`) are documented in
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-08-18
+
+### 🚀 Major Architectural Reorganization, Bug Fixes & Automated Testing Suite
+- **Dedicated Subsystem Architecture (`~/.gemini/hud/`)**:
+  - Relocated core statusline files (`hud.js`, `hud_gui.ps1`, `hud_gui.html`, `hud_config.json`) into dedicated `~/.gemini/hud/` directory.
+  - Implemented multi-tier candidate resolution (`process.env.HUD_CONFIG_PATH` $\rightarrow$ `~/.gemini/hud/` $\rightarrow$ `~/.gemini/` $\rightarrow$ sibling paths).
+  - Updated `settings.json` `statusLine.command` to point to dedicated path with backwards-compatible fallback.
+- **Native WinForms GUI Bug Fixes & Polish (`hud_gui.ps1`)**:
+  - Fixed `HashSet[string]` constructor `MethodException` on load by casting `$itemMeta.Keys` to `[string[]]`.
+  - Isolated per-tab ComboBox loop closures via `$lineStyleCombos` dictionary lookup.
+  - Disabled ListBox horizontal auto-scroll left-clipping and expanded action button clearances to 165px.
+  - Updated window and groupbox titles to unified AGY HUD branding.
+- **Comprehensive AGY HUD Branding & Alias Alignment**:
+  - Standardized CLI output headers in `hud.js` to `=== Antigravity CLI (AGY) Statusline HUD ===`.
+  - Registered explicit `agy-hud` and `agy-hud-gui` aliases in `profile.d/20-Aliases.ps1` alongside `hud` and `hud-gui`.
+  - Updated `Show-ProfileCommands` documentation and generated comprehensive `~/.gemini/hud/README.md`.
+- **Co-Located Automated Test Suite (`~/.gemini/hud/tests/`)**:
+  - Created 4 dedicated automated test suites covering Node.js telemetry/CLI matrix, headless WinForms GUI, Web GUI template integrity, and `settings.json` integration with 100% pass rate.
+  - Built master unified test runner `run_all_hud_tests.ps1`.
+
+---
+
 ## [2.1.0] - 2026-08-18
 
 ### 🚀 Enhancements & Invariant Hardening

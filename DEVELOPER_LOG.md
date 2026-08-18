@@ -6,6 +6,30 @@
 
 ---
 
+### [SESSION LOG: 2026-08-18 (Part 2 - Dedicated Subsystem Reorganization, WinForms Fixes, Branding & Testing Suite)]
+* **Completed Objectives:**
+  - Migrated HUD subsystem into dedicated `~/.gemini/hud/` architecture with multi-tier candidate resolution (`process.env.HUD_CONFIG_PATH` $\rightarrow$ `~/.gemini/hud/` $\rightarrow$ `~/.gemini/` $\rightarrow$ sibling paths).
+  - Fixed WinForms configurator (`hud_gui.ps1`) `HashSet` casting `MethodException` via `[string[]]$itemMeta.Keys`.
+  - Isolated per-tab ComboBox loop closures via `$lineStyleCombos` dictionary lookup.
+  - Disabled ListBox horizontal auto-scroll left-clipping and widened enable buttons to 165px.
+  - Standardized CLI output headers to unified `=== Antigravity CLI (AGY) Statusline HUD ===` branding.
+  - Added explicit `agy-hud` and `agy-hud-gui` aliases in `profile.d/20-Aliases.ps1` and updated `Show-ProfileCommands`.
+  - Built co-located 4-suite automated test matrix (`hud_engine.test.js`, `hud_gui.test.ps1`, `hud_web_gui.test.js`, `hud_integration.test.js`) and unified runner `run_all_hud_tests.ps1` with 100% pass rate.
+  - Bumped version to `2.2.0` in `package.json` and updated `CHANGELOG.md`.
+
+* **Files Modified / Created:**
+  - `~/.gemini/hud/*` — Relocated subsystem files and co-located automated test suites
+  - `bin/hud.js`, `bin/hud_gui.ps1`, `web/hud_gui.html` — Updated repository artifacts
+  - `~/.gemini/settings.json` — Updated `statusLine.command` to point to dedicated path
+  - `profile.d/20-Aliases.ps1`, `profile.d/10-Functions.ps1` — Added AGY HUD aliases and documentation
+  - `package.json`, `CHANGELOG.md` — Bumped to 2.2.0
+
+* **Validation Status:**
+  - **AGY HUD Test Suite:** 100% Pass (18/18 total assertions across 4 suites).
+  - **PowerShell Profile Tests:** 100% Pass (81/81 tests passed via Pester).
+
+---
+
 ### [SESSION LOG: 2026-08-18 (Autonomous Workspace Auto-Discovery & Multi-Variant `/fork` Resolution)]
 * **Completed Objectives:**
   - Resolved Antigravity `/fork` failure (`⚠️ Project Not Found \n └ Project AgyHud not found`).

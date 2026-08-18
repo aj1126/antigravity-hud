@@ -68,9 +68,19 @@ function getUptimeColor(seconds, thresholds) {
 }
 
 function getConfigPath() {
-  if (fs.existsSync(primaryConfigPath)) return primaryConfigPath;
-  if (fs.existsSync(fallbackConfigPath)) return fallbackConfigPath;
-  return primaryConfigPath;
+  if (process.env.HUD_CONFIG_PATH && fs.existsSync(process.env.HUD_CONFIG_PATH)) {
+    return process.env.HUD_CONFIG_PATH;
+  }
+  const dedicatedPath = path.join(homeDir, '.gemini', 'hud', 'hud_config.json');
+  const legacyRootPath = path.join(homeDir, '.gemini', 'hud_config.json');
+  const siblingPath = path.join(__dirname, 'hud_config.json');
+  const parentPath = path.join(__dirname, '..', 'hud_config.json');
+
+  if (fs.existsSync(dedicatedPath)) return dedicatedPath;
+  if (fs.existsSync(legacyRootPath)) return legacyRootPath;
+  if (fs.existsSync(siblingPath)) return siblingPath;
+  if (fs.existsSync(parentPath)) return parentPath;
+  return dedicatedPath;
 }
 
 function loadConfig() {
@@ -125,7 +135,10 @@ function loadConfig() {
 }
 
 function saveConfig(cfg) {
-  const target = primaryConfigPath;
+  let target = getConfigPath();
+  if (!fs.existsSync(target)) {
+    target = path.join(homeDir, '.gemini', 'hud', 'hud_config.json');
+  }
   const dir = path.dirname(target);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(target, JSON.stringify(cfg, null, 2), 'utf8');
@@ -235,7 +248,7 @@ if (args.length > 0) {
   const cfg = loadConfig();
 
   if (cmd === 'list' || cmd === 'l' || cmd === 'ls') {
-    console.log('\x1b[1m\x1b[36m=== Antigravity HUD Configuration ===\x1b[0m');
+    console.log('\x1b[1m\x1b[36m=== Antigravity CLI (AGY) Statusline HUD ===\x1b[0m');
     console.log(`Config File: \x1b[33m${getConfigPath()}\x1b[0m`);
     console.log(`Lines: \x1b[32m${cfg.lines}\x1b[0m, Separator: "${cfg.separator}", Compact Mode: \x1b[36m${cfg.compact_mode}\x1b[0m\n`);
     
@@ -302,7 +315,7 @@ if (args.length > 0) {
     const item = args[1]?.toLowerCase();
     const style = args[2]?.toLowerCase();
     if (!item) {
-      console.log('\x1b[1m\x1b[36m=== Antigravity Item Formatting Styles ===\x1b[0m\n');
+      console.log('\x1b[1m\x1b[36m=== AGY HUD: Item Formatting Styles ===\x1b[0m\n');
       console.log('Current Overrides:');
       const styles = cfg.item_styles || {};
       if (Object.keys(styles).length === 0) {
@@ -347,7 +360,7 @@ if (args.length > 0) {
     const upCfg = cfg.session_uptime || DEFAULT_CONFIG.session_uptime;
 
     if (!sub) {
-      console.log('\x1b[1m\x1b[36m=== Antigravity HUD: Session Uptime Configuration ===\x1b[0m\n');
+      console.log('\x1b[1m\x1b[36m=== AGY HUD: Session Uptime Configuration ===\x1b[0m\n');
       const secStatus = upCfg.show_seconds !== false ? '\x1b[32mON\x1b[0m (shows seconds after minute: 24m 15s)' : '\x1b[33mOFF\x1b[0m (minutes only: 24m)';
       console.log(`  Show Seconds: ${secStatus}`);
       console.log('\n\x1b[1mColor Thresholds:\x1b[0m');
@@ -444,7 +457,7 @@ if (args.length > 0) {
         ctxPercent = Math.round(ctxPercent);
       }
 
-      console.log('\x1b[1m\x1b[36m=== Antigravity HUD: Fork Advisory Status ===\x1b[0m\n');
+      console.log('\x1b[1m\x1b[36m=== AGY HUD: Fork Advisory Status ===\x1b[0m\n');
       console.log(`  Advisory Enabled:     ${fCfg.enabled !== false ? '\x1b[32mON\x1b[0m' : '\x1b[31mOFF\x1b[0m'}`);
       console.log(`  Current Session ID:   \x1b[90m${convId || 'Unknown'}\x1b[0m`);
       console.log(`  Current Context:      \x1b[33m${ctxPercent}%\x1b[0m`);
@@ -518,7 +531,7 @@ if (args.length > 0) {
     ];
 
     if (!secInput) {
-      console.log('\x1b[1m\x1b[36m=== Antigravity Statusline Ticker / Refresh Interval ===\x1b[0m\n');
+      console.log('\x1b[1m\x1b[36m=== AGY HUD: Statusline Ticker / Refresh Interval ===\x1b[0m\n');
       let currentSec = 'Default (Event-Driven)';
       for (const sp of settingsPaths) {
         if (fs.existsSync(sp)) {
@@ -658,7 +671,7 @@ if (args.length > 0) {
     server.listen(PORT, '127.0.0.1', () => {
       const url = `http://localhost:${PORT}`;
       console.log('\x1b[1m\x1b[36m=======================================================\x1b[0m');
-      console.log('\x1b[1m\x1b[36m        Antigravity Statusline HUD Configurator        \x1b[0m');
+      console.log('\x1b[1m\x1b[36m      Antigravity CLI (AGY) Statusline HUD Config      \x1b[0m');
       console.log('\x1b[1m\x1b[36m=======================================================\x1b[0m\n');
       console.log(`Web GUI running at: \x1b[32m${url}\x1b[0m`);
       console.log('Press \x1b[33mCtrl+C\x1b[0m in this terminal to exit.\n');
@@ -705,7 +718,7 @@ if (args.length > 0) {
       if (projName && projName.toLowerCase() !== wsName.toLowerCase()) defTarget = `${projName} › ${wsName}`;
       else if (projName) defTarget = projName;
 
-      console.log('\x1b[1m\x1b[36m=== Antigravity Session & Tab Title ===\x1b[0m\n');
+      console.log('\x1b[1m\x1b[36m=== AGY HUD: Session & Tab Title ===\x1b[0m\n');
       console.log(`  Current CWD:          \x1b[90m${cwd}\x1b[0m`);
       console.log(`  Custom Title:         ${curTitle ? `\x1b[32m${curTitle}\x1b[0m` : '\x1b[33m[NONE] (using default)\x1b[0m'}`);
       console.log(`  Resolved Display:     \x1b[34m📁 ${curTitle || defTarget}\x1b[0m`);
@@ -743,7 +756,7 @@ if (args.length > 0) {
 
   if (cmd === 'help' || cmd === 'h' || cmd === '?' || cmd === '/?') {
     console.log('\x1b[1m\x1b[36m=======================================================\x1b[0m');
-    console.log('\x1b[1m\x1b[36m           Antigravity Statusline HUD Help             \x1b[0m');
+    console.log('\x1b[1m\x1b[36m        Antigravity CLI (AGY) Statusline HUD Help      \x1b[0m');
     console.log('\x1b[1m\x1b[36m=======================================================\x1b[0m\n');
     console.log('\x1b[1mCommands:\x1b[0m');
     console.log('  \x1b[33mhud\x1b[0m                           View active layout and items status');
@@ -1044,103 +1057,12 @@ function getForkAdvisory(payload, ctxPercent, cfg, git = {}, style = 'full') {
   return '';
 }
 
-function generateProjectVariants(name, folderUri) {
-  const variants = new Set();
-  if (!name && !folderUri) return variants;
-
-  const rawNames = [];
-  if (name) rawNames.push(name);
-  if (folderUri) {
-    const cleanUri = folderUri.replace(/^file:\/\/\/?/, '');
-    const folderName = path.basename(decodeURIComponent(cleanUri));
-    if (folderName) rawNames.push(folderName);
-  }
-
-  for (const raw of rawNames) {
-    if (!raw || !raw.trim()) continue;
-    const clean = raw.replace(/^\.+/, '').trim();
-    if (!clean) continue;
-
-    variants.add(clean);
-    variants.add(clean.toLowerCase());
-
-    const words = clean
-      .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-      .replace(/[^a-zA-Z0-9]+/g, ' ')
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean);
-
-    if (words.length > 0) {
-      const pascal = words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join('');
-      variants.add(pascal);
-
-      const camel = words[0].toLowerCase() + words.slice(1).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join('');
-      variants.add(camel);
-
-      const kebab = words.map(w => w.toLowerCase()).join('-');
-      variants.add(kebab);
-
-      const snake = words.map(w => w.toLowerCase()).join('_');
-      variants.add(snake);
-
-      const flat = words.map(w => w.toLowerCase()).join('');
-      variants.add(flat);
-
-      if (words.length > 1) {
-        const last = words[words.length - 1];
-        variants.add(last.toLowerCase());
-        variants.add(last.charAt(0).toUpperCase() + last.slice(1).toLowerCase());
-      }
-
-      if (clean.toLowerCase().includes('antigravity') || clean.toLowerCase().includes('agy')) {
-        const agyWords = words.map(w => (w.toLowerCase() === 'antigravity' ? 'agy' : w));
-        variants.add(agyWords.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(''));
-        variants.add(agyWords.map(w => w.toLowerCase()).join('-'));
-        variants.add(agyWords.map(w => w.toLowerCase()).join('_'));
-        variants.add(agyWords.map(w => w.toLowerCase()).join(''));
-
-        const agyFullWords = words.map(w => (w.toLowerCase() === 'agy' ? 'antigravity' : w));
-        variants.add(agyFullWords.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(''));
-        variants.add(agyFullWords.map(w => w.toLowerCase()).join('-'));
-        variants.add(agyFullWords.map(w => w.toLowerCase()).join('_'));
-      }
-    }
-
-    if (clean.includes('.')) {
-      const parts = clean.split('.');
-      for (const p of parts) {
-        const cp = p.replace(/^\.+/, '').trim();
-        if (cp) {
-          variants.add(cp);
-          variants.add(cp.toLowerCase());
-        }
-      }
-    }
-  }
-
-  const result = new Set();
-  for (const v of variants) {
-    const sanitized = v.replace(/^\.+/, '').trim();
-    if (sanitized && !sanitized.includes('/') && !sanitized.includes('\\')) {
-      result.add(sanitized);
-    }
-  }
-  return result;
-}
-
 function syncProjectAliases(force = false) {
   const projectsDir = path.join(homeDir, '.gemini', 'config', 'projects');
-  if (!fs.existsSync(projectsDir)) {
-    try {
-      fs.mkdirSync(projectsDir, { recursive: true });
-    } catch (_) {
-      return 0;
-    }
-  }
+  if (!fs.existsSync(projectsDir)) return 0;
 
   const stampFile = path.join(homeDir, '.gemini', 'tmp', 'last_project_sync.json');
-  if (!force && !process.env.HUD_TEST_MODE) {
+  if (!force) {
     try {
       if (fs.existsSync(stampFile)) {
         const stamp = JSON.parse(fs.readFileSync(stampFile, 'utf8'));
@@ -1151,69 +1073,6 @@ function syncProjectAliases(force = false) {
 
   let createdCount = 0;
   try {
-    // 1. Auto-discover workspace repos in B:\Repos, CWD, etc.
-    const scanDirs = [];
-    const bRepos = 'B:\\Repos';
-    if (fs.existsSync(bRepos)) {
-      try {
-        const entries = fs.readdirSync(bRepos, { withFileTypes: true });
-        for (const ent of entries) {
-          if (ent.isDirectory() && !ent.name.startsWith('.')) {
-            scanDirs.push(path.join(bRepos, ent.name));
-          }
-        }
-      } catch (_) {}
-    }
-    const curDir = process.cwd();
-    if (curDir && !scanDirs.includes(curDir)) {
-      scanDirs.push(curDir);
-    }
-
-    const existingFiles = fs.readdirSync(projectsDir).filter(f => f.endsWith('.json'));
-    const registeredUris = new Set();
-    for (const f of existingFiles) {
-      try {
-        const raw = fs.readFileSync(path.join(projectsDir, f), 'utf8');
-        const data = JSON.parse(raw);
-        const uri = data.projectResources?.resources?.[0]?.folderUri;
-        if (uri) {
-          registeredUris.add(path.resolve(uri.replace(/^file:\/\/\/?/, '')).toLowerCase());
-        }
-      } catch (_) {}
-    }
-
-    for (const dir of scanDirs) {
-      const resolvedDir = path.resolve(dir);
-      if (!registeredUris.has(resolvedDir.toLowerCase())) {
-        let baseName = path.basename(resolvedDir).replace(/^\.+/, '').trim();
-        const pkgPath = path.join(resolvedDir, 'package.json');
-        if (fs.existsSync(pkgPath)) {
-          try {
-            const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-            if (pkg.name) baseName = pkg.name.replace(/^\.+/, '').trim();
-          } catch (_) {}
-        }
-
-        if (baseName) {
-          const baseJsonPath = path.join(projectsDir, `${baseName}.json`);
-          const folderUri = `file://${resolvedDir.replace(/\\/g, '/')}`;
-          const projData = {
-            id: baseName.toLowerCase().replace(/[^a-z0-9_-]/g, '-'),
-            name: baseName,
-            projectResources: {
-              resources: [{ folderUri }]
-            }
-          };
-          if (!fs.existsSync(baseJsonPath)) {
-            fs.writeFileSync(baseJsonPath, JSON.stringify(projData, null, 2), 'utf8');
-            createdCount++;
-          }
-          registeredUris.add(resolvedDir.toLowerCase());
-        }
-      }
-    }
-
-    // 2. Generate all alias variants for all project JSONs
     const files = fs.readdirSync(projectsDir).filter(f => f.endsWith('.json'));
     for (const f of files) {
       const fullPath = path.join(projectsDir, f);
@@ -1221,10 +1080,42 @@ function syncProjectAliases(force = false) {
       const data = JSON.parse(raw);
       if (!data || !data.name) continue;
 
-      const uri = data.projectResources?.resources?.[0]?.folderUri || '';
-      const variants = generateProjectVariants(data.name, uri);
+      const variants = new Set();
+      variants.add(data.name);
+      variants.add(data.name.replace(/[^a-zA-Z0-9_]/g, ''));
+      variants.add(data.name.toLowerCase());
+      variants.add(data.name.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase());
+      variants.add(data.name.replace(/[\s_]+/g, '-').toLowerCase());
+      variants.add(data.name.replace(/[\s-]+/g, '_'));
+
+      if (data.name.includes('.')) {
+        const parts = data.name.split('.');
+        const lastPart = parts[parts.length - 1];
+        if (lastPart) {
+          variants.add(lastPart);
+          variants.add(lastPart.toLowerCase());
+        }
+      }
+
+      if (data.projectResources?.resources?.[0]?.folderUri) {
+        const folderUri = data.projectResources.resources[0].folderUri;
+        const cleanUri = folderUri.replace(/^file:\/\/\/?/, '');
+        const folderName = path.basename(decodeURIComponent(cleanUri));
+        if (folderName) {
+          variants.add(folderName);
+          variants.add(folderName.replace(/[^a-zA-Z0-9_]/g, ''));
+          if (folderName.includes('.')) {
+            const sub = folderName.split('.').pop();
+            if (sub) {
+              variants.add(sub);
+              variants.add(sub.toLowerCase());
+            }
+          }
+        }
+      }
 
       for (const variant of variants) {
+        if (!variant || !variant.trim()) continue;
         const cleanVariant = variant.replace(/^\.+/, '').trim();
         if (!cleanVariant) continue;
         const targetPath = path.join(projectsDir, `${cleanVariant}.json`);
@@ -1235,11 +1126,9 @@ function syncProjectAliases(force = false) {
       }
     }
 
-    if (!process.env.HUD_TEST_MODE) {
-      const sDir = path.dirname(stampFile);
-      if (!fs.existsSync(sDir)) fs.mkdirSync(sDir, { recursive: true });
-      fs.writeFileSync(stampFile, JSON.stringify({ timestamp: Date.now() }), 'utf8');
-    }
+    const sDir = path.dirname(stampFile);
+    if (!fs.existsSync(sDir)) fs.mkdirSync(sDir, { recursive: true });
+    fs.writeFileSync(stampFile, JSON.stringify({ timestamp: Date.now() }), 'utf8');
   } catch (_) {}
   return createdCount;
 }
