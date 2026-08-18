@@ -6,6 +6,24 @@
 
 ---
 
+### [SESSION LOG: 2026-08-18 (Part 9 - Formal Approval of Architectural Invariants, Dual-Location Standard & Master Plans)]
+* **Completed Objectives:**
+  - Formally approved and persisted the **Dual-Location Architecture & Anti-Gitification of `~/.gemini/`** invariant:
+    - `B:\Repos\antigravity-hud\` is the canonical GitHub-connected development repository.
+    - `~/.gemini/scripts/` is the active physical runtime execution target.
+    - `~/.gemini/` is strictly protected against Git repository initialization to prevent tracking live session caches, credentials, and user data.
+  - Formally approved and persisted the **GUI Configuration Target Priority & Dual-Sync Invariant** (Section 9) and **Detached Background Post-Exit Execution Standard** (Section 10) into `~/.gemini/antigravity/knowledge/runtime_drift_and_self_healing_protocol.md`.
+  - Formally approved all 4 master plans (`learning_proposal.md`, `agy_hooks_implementation_plan.md`, `master_implementation_plan_and_remaining_steps.md`, `update_agy_hud_active_version_plan.md`).
+  - Quad-synchronized developer progress logs across all workspace and global knowledge tiers.
+
+* **Branch Status Matrix:**
+  - `main` (`5aaeacc`): Production baseline (v2.3.0, self-healing, BOM-free UTF-8).
+  - `feature/hud-gui-active-scripts-sync` (`d42b21c`): WinForms GUI active scripts targeting & dual-sync save (Active).
+  - `feature/agy-lifecycle-hooks` (`ace66b4`): Zero-quota lifecycle hooks suite (6 suites / 38 assertions passing).
+  - `feature/local-ollama-agents` (`d16b48a`): Planned local Ollama offloading for GTX 1660 SUPER.
+
+---
+
 ### [SESSION LOG: 2026-08-18 (Part 8 - WinForms GUI Active Scripts Sync & Master Implementation Roadmap)]
 * **Completed Objectives:**
   - Resolved WinForms GUI save destination mismatch by prioritizing `~/.gemini/scripts/hud_config.json` as the #1 candidate in both `hud_gui.ps1` and `hud.js`.
