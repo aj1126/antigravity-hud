@@ -1044,12 +1044,103 @@ function getForkAdvisory(payload, ctxPercent, cfg, git = {}, style = 'full') {
   return '';
 }
 
+function generateProjectVariants(name, folderUri) {
+  const variants = new Set();
+  if (!name && !folderUri) return variants;
+
+  const rawNames = [];
+  if (name) rawNames.push(name);
+  if (folderUri) {
+    const cleanUri = folderUri.replace(/^file:\/\/\/?/, '');
+    const folderName = path.basename(decodeURIComponent(cleanUri));
+    if (folderName) rawNames.push(folderName);
+  }
+
+  for (const raw of rawNames) {
+    if (!raw || !raw.trim()) continue;
+    const clean = raw.replace(/^\.+/, '').trim();
+    if (!clean) continue;
+
+    variants.add(clean);
+    variants.add(clean.toLowerCase());
+
+    const words = clean
+      .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+      .replace(/[^a-zA-Z0-9]+/g, ' ')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+
+    if (words.length > 0) {
+      const pascal = words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join('');
+      variants.add(pascal);
+
+      const camel = words[0].toLowerCase() + words.slice(1).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join('');
+      variants.add(camel);
+
+      const kebab = words.map(w => w.toLowerCase()).join('-');
+      variants.add(kebab);
+
+      const snake = words.map(w => w.toLowerCase()).join('_');
+      variants.add(snake);
+
+      const flat = words.map(w => w.toLowerCase()).join('');
+      variants.add(flat);
+
+      if (words.length > 1) {
+        const last = words[words.length - 1];
+        variants.add(last.toLowerCase());
+        variants.add(last.charAt(0).toUpperCase() + last.slice(1).toLowerCase());
+      }
+
+      if (clean.toLowerCase().includes('antigravity') || clean.toLowerCase().includes('agy')) {
+        const agyWords = words.map(w => (w.toLowerCase() === 'antigravity' ? 'agy' : w));
+        variants.add(agyWords.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(''));
+        variants.add(agyWords.map(w => w.toLowerCase()).join('-'));
+        variants.add(agyWords.map(w => w.toLowerCase()).join('_'));
+        variants.add(agyWords.map(w => w.toLowerCase()).join(''));
+
+        const agyFullWords = words.map(w => (w.toLowerCase() === 'agy' ? 'antigravity' : w));
+        variants.add(agyFullWords.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(''));
+        variants.add(agyFullWords.map(w => w.toLowerCase()).join('-'));
+        variants.add(agyFullWords.map(w => w.toLowerCase()).join('_'));
+      }
+    }
+
+    if (clean.includes('.')) {
+      const parts = clean.split('.');
+      for (const p of parts) {
+        const cp = p.replace(/^\.+/, '').trim();
+        if (cp) {
+          variants.add(cp);
+          variants.add(cp.toLowerCase());
+        }
+      }
+    }
+  }
+
+  const result = new Set();
+  for (const v of variants) {
+    const sanitized = v.replace(/^\.+/, '').trim();
+    if (sanitized && !sanitized.includes('/') && !sanitized.includes('\\')) {
+      result.add(sanitized);
+    }
+  }
+  return result;
+}
+
 function syncProjectAliases(force = false) {
   const projectsDir = path.join(homeDir, '.gemini', 'config', 'projects');
-  if (!fs.existsSync(projectsDir)) return 0;
+  if (!fs.existsSync(projectsDir)) {
+    try {
+      fs.mkdirSync(projectsDir, { recursive: true });
+    } catch (_) {
+      return 0;
+    }
+  }
 
   const stampFile = path.join(homeDir, '.gemini', 'tmp', 'last_project_sync.json');
-  if (!force) {
+  if (!force && !process.env.HUD_TEST_MODE) {
     try {
       if (fs.existsSync(stampFile)) {
         const stamp = JSON.parse(fs.readFileSync(stampFile, 'utf8'));
@@ -1060,6 +1151,69 @@ function syncProjectAliases(force = false) {
 
   let createdCount = 0;
   try {
+    // 1. Auto-discover workspace repos in B:\Repos, CWD, etc.
+    const scanDirs = [];
+    const bRepos = 'B:\\Repos';
+    if (fs.existsSync(bRepos)) {
+      try {
+        const entries = fs.readdirSync(bRepos, { withFileTypes: true });
+        for (const ent of entries) {
+          if (ent.isDirectory() && !ent.name.startsWith('.')) {
+            scanDirs.push(path.join(bRepos, ent.name));
+          }
+        }
+      } catch (_) {}
+    }
+    const curDir = process.cwd();
+    if (curDir && !scanDirs.includes(curDir)) {
+      scanDirs.push(curDir);
+    }
+
+    const existingFiles = fs.readdirSync(projectsDir).filter(f => f.endsWith('.json'));
+    const registeredUris = new Set();
+    for (const f of existingFiles) {
+      try {
+        const raw = fs.readFileSync(path.join(projectsDir, f), 'utf8');
+        const data = JSON.parse(raw);
+        const uri = data.projectResources?.resources?.[0]?.folderUri;
+        if (uri) {
+          registeredUris.add(path.resolve(uri.replace(/^file:\/\/\/?/, '')).toLowerCase());
+        }
+      } catch (_) {}
+    }
+
+    for (const dir of scanDirs) {
+      const resolvedDir = path.resolve(dir);
+      if (!registeredUris.has(resolvedDir.toLowerCase())) {
+        let baseName = path.basename(resolvedDir).replace(/^\.+/, '').trim();
+        const pkgPath = path.join(resolvedDir, 'package.json');
+        if (fs.existsSync(pkgPath)) {
+          try {
+            const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+            if (pkg.name) baseName = pkg.name.replace(/^\.+/, '').trim();
+          } catch (_) {}
+        }
+
+        if (baseName) {
+          const baseJsonPath = path.join(projectsDir, `${baseName}.json`);
+          const folderUri = `file://${resolvedDir.replace(/\\/g, '/')}`;
+          const projData = {
+            id: baseName.toLowerCase().replace(/[^a-z0-9_-]/g, '-'),
+            name: baseName,
+            projectResources: {
+              resources: [{ folderUri }]
+            }
+          };
+          if (!fs.existsSync(baseJsonPath)) {
+            fs.writeFileSync(baseJsonPath, JSON.stringify(projData, null, 2), 'utf8');
+            createdCount++;
+          }
+          registeredUris.add(resolvedDir.toLowerCase());
+        }
+      }
+    }
+
+    // 2. Generate all alias variants for all project JSONs
     const files = fs.readdirSync(projectsDir).filter(f => f.endsWith('.json'));
     for (const f of files) {
       const fullPath = path.join(projectsDir, f);
@@ -1067,42 +1221,10 @@ function syncProjectAliases(force = false) {
       const data = JSON.parse(raw);
       if (!data || !data.name) continue;
 
-      const variants = new Set();
-      variants.add(data.name);
-      variants.add(data.name.replace(/[^a-zA-Z0-9_]/g, ''));
-      variants.add(data.name.toLowerCase());
-      variants.add(data.name.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase());
-      variants.add(data.name.replace(/[\s_]+/g, '-').toLowerCase());
-      variants.add(data.name.replace(/[\s-]+/g, '_'));
-
-      if (data.name.includes('.')) {
-        const parts = data.name.split('.');
-        const lastPart = parts[parts.length - 1];
-        if (lastPart) {
-          variants.add(lastPart);
-          variants.add(lastPart.toLowerCase());
-        }
-      }
-
-      if (data.projectResources?.resources?.[0]?.folderUri) {
-        const folderUri = data.projectResources.resources[0].folderUri;
-        const cleanUri = folderUri.replace(/^file:\/\/\/?/, '');
-        const folderName = path.basename(decodeURIComponent(cleanUri));
-        if (folderName) {
-          variants.add(folderName);
-          variants.add(folderName.replace(/[^a-zA-Z0-9_]/g, ''));
-          if (folderName.includes('.')) {
-            const sub = folderName.split('.').pop();
-            if (sub) {
-              variants.add(sub);
-              variants.add(sub.toLowerCase());
-            }
-          }
-        }
-      }
+      const uri = data.projectResources?.resources?.[0]?.folderUri || '';
+      const variants = generateProjectVariants(data.name, uri);
 
       for (const variant of variants) {
-        if (!variant || !variant.trim()) continue;
         const cleanVariant = variant.replace(/^\.+/, '').trim();
         if (!cleanVariant) continue;
         const targetPath = path.join(projectsDir, `${cleanVariant}.json`);
@@ -1113,9 +1235,11 @@ function syncProjectAliases(force = false) {
       }
     }
 
-    const sDir = path.dirname(stampFile);
-    if (!fs.existsSync(sDir)) fs.mkdirSync(sDir, { recursive: true });
-    fs.writeFileSync(stampFile, JSON.stringify({ timestamp: Date.now() }), 'utf8');
+    if (!process.env.HUD_TEST_MODE) {
+      const sDir = path.dirname(stampFile);
+      if (!fs.existsSync(sDir)) fs.mkdirSync(sDir, { recursive: true });
+      fs.writeFileSync(stampFile, JSON.stringify({ timestamp: Date.now() }), 'utf8');
+    }
   } catch (_) {}
   return createdCount;
 }

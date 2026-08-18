@@ -1,6 +1,6 @@
 {
   "name": "antigravity-hud",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Real-time multi-line TUI statusline HUD, live telemetry monitor, and interactive layout configurator for Antigravity AI sessions.",
   "main": "bin/hud.js",
   "bin": {

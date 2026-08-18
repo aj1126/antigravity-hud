@@ -4,6 +4,15 @@ All notable changes to **Antigravity HUD** (`antigravity-hud`) are documented in
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-08-18
+
+### 🚀 Enhancements & Invariant Hardening
+- **Autonomous Workspace Auto-Discovery (`hud sync-projects`)**:
+  - Automatically scans workspace repositories across `B:\Repos\` and active working directory, registering missing workspace configurations into `~/.gemini/config/projects/`.
+- **Multi-Variant `/fork` Project Alias Engine**:
+  - Automatically synthesizes true PascalCase (`AntigravityHud`, `AgyHud`), camelCase, kebab-case (`antigravity-hud`, `agy-hud`), snake_case (`antigravity_hud`, `agy_hud`), shorthand trailing tokens (`hud`, `Hud`), and `agy-*` $\leftrightarrow$ `antigravity-*` abbreviation mappings.
+  - Enforces leading dot sanitization (prohibiting `.name` project IDs) and UTF-8 BOM-free configuration persistence.
+
 ---
 
 ## [2.0.0] - 2026-08-17
