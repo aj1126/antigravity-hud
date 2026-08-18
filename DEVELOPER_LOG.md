@@ -6,6 +6,30 @@
 
 ---
 
+### [SESSION LOG: 2026-08-18 (Part 4 - Agent Skill Governance, Vendor Protection Standard & Multi-Scope Skill Auditor)]
+* **Completed Objectives:**
+  - Codified the universal **Agent Skill Governance Standard** (`~/.gemini/antigravity/knowledge/agent_skill_governance.md`).
+  - Established the **Vendor Canonical Protected Standard** (`[OPTIMAL] VENDOR CANONICAL`): all vendor ecosystem skills in `~/.gemini/skills/*` are protected against modification with 0 warnings.
+  - Implemented the **Custom Skill Optimization & Grilling Protocol**: mandates thorough interactive alignment (`/grill-me`), token deltas, directory tree plans, and link integrity verification before refactoring custom skills.
+  - Upgraded [`Audit-AgySkills.ps1`](file:///C:/Users/ajjuk/.gemini/config/skills/audit-agy-skills/scripts/Audit-AgySkills.ps1) with multi-scope execution (`-Scope Global|Local|Vendor|All|Custom`), local markdown link validation, template placeholder filters, and category-aware budgets.
+  - Refactored [`agy-customizations`](file:///C:/Users/ajjuk/.gemini/config/skills/agy-customizations/SKILL.md), [`export-signatures`](file:///C:/Users/ajjuk/.gemini/config/skills/export-signatures/SKILL.md), and [`audit-agy-skills`](file:///C:/Users/ajjuk/.gemini/config/skills/audit-agy-skills/SKILL.md) to serve as gold-standard lean routers (< 200 tokens).
+  - Created working branch `audit-agy-skills` in `antigravity-hud`.
+
+* **Files Modified / Created:**
+  - `~/.gemini/antigravity/knowledge/agent_skill_governance.md` — central governance rule
+  - `~/.gemini/config/skills/audit-agy-skills/scripts/Audit-AgySkills.ps1` — multi-scope category-aware auditor
+  - `~/.gemini/config/skills/audit-agy-skills/SKILL.md` — scope selection router
+  - `~/.gemini/config/skills/audit-agy-skills/resources/progressive_disclosure_guide.md` — progressive disclosure architecture guide
+  - `~/.gemini/config/skills/agy-customizations/*` — router refactor and `docs/discovery_and_priority.md`
+  - `~/.gemini/config/skills/export-signatures/SKILL.md` — router refactor
+
+* **Validation Status:**
+  - **Global Custom Skills Audit:** 8/13 conforming routers/workflows.
+  - **Vendor Ecosystem Skills Audit:** 14/14 optimal canonical (0 warnings).
+  - **Multi-Scope Audit (`-Scope All`):** 100% verified across Global, Local, and Vendor targets.
+
+---
+
 ### [SESSION LOG: 2026-08-18 (Part 3 - Active Version Upgrade, Automated Integrity Checks & Self-Healing Engine)]
 * **Completed Objectives:**
   - Upgraded active runtime scripts in `~/.gemini/scripts/` (`hud.js`, `hud_gui.ps1`, `hud_gui.html`) to full v2.3.0 parity with `~/.gemini/hud/` and canonical repository.
