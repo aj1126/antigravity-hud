@@ -2,7 +2,14 @@ const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
 
-const htmlPath = path.join(__dirname, '..', 'hud_gui.html');
+const homeDir = process.env.USERPROFILE || process.env.HOME || require('os').homedir();
+const candidatePaths = [
+  path.join(__dirname, '..', 'web', 'hud_gui.html'),
+  path.join(__dirname, '..', 'hud_gui.html'),
+  path.join(homeDir, '.gemini', 'hud', 'hud_gui.html'),
+  path.join(homeDir, '.gemini', 'scripts', 'hud_gui.html')
+];
+const htmlPath = candidatePaths.find(p => fs.existsSync(p)) || candidatePaths[0];
 const fixtureCfgPath = path.join(__dirname, 'fixtures', 'sample_full_hud_config.json');
 
 console.log('\n\x1b[1m=== Test Suite 3: Web GUI Template & Schema Integrity ===\x1b[0m');

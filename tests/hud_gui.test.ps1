@@ -15,7 +15,13 @@ Describe "Antigravity CLI (AGY) - WinForms HUD Configurator Headless Test Suite"
         $env:HUD_CONFIG_PATH = $script:TestConfigPath
         $env:HUD_TEST_MODE = '1'
 
-        $script:HudGuiPath = Join-Path $PSScriptRoot "..\hud_gui.ps1"
+        $candidatePaths = @(
+            (Join-Path $PSScriptRoot "..\bin\hud_gui.ps1"),
+            (Join-Path $PSScriptRoot "..\hud_gui.ps1"),
+            (Join-Path $HOME ".gemini\hud\hud_gui.ps1"),
+            (Join-Path $HOME ".gemini\scripts\hud_gui.ps1")
+        )
+        $script:HudGuiPath = $candidatePaths | Where-Object { Test-Path $_ } | Select-Object -First 1
     }
 
     AfterAll {

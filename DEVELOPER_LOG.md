@@ -6,6 +6,33 @@
 
 ---
 
+### [SESSION LOG: 2026-08-18 (Part 3 - Active Version Upgrade, Automated Integrity Checks & Self-Healing Engine)]
+* **Completed Objectives:**
+  - Upgraded active runtime scripts in `~/.gemini/scripts/` (`hud.js`, `hud_gui.ps1`, `hud_gui.html`) to full v2.3.0 parity with `~/.gemini/hud/` and canonical repository.
+  - Implemented automated health check and drift detection (`hud check`) with SHA-256 verification, BOM preamble detection, schema validation, and hook inspection.
+  - Implemented self-healing auto-repair engine (`hud repair`, `hud sync`, `Sync-AgyHud.ps1`) for automated drift restoration, BOM stripping, schema hydration, and statusline hook recovery.
+  - Developed comprehensive 10-test fault injection and auto-repair test suite (`tests/hud_checks_and_corrections.test.js`) operating under strict isolated sandbox guardrails.
+  - Hardened path resolution across all test suites and expanded master runner (`run_all_hud_tests.ps1`) to a 5-suite matrix with 100% pass rate (31/31 assertions).
+  - Hardened `install.ps1` with dual-target deployment and post-install health verification.
+  - Bumped version to `2.3.0` in `package.json` and updated `CHANGELOG.md`.
+
+* **Files Modified / Created:**
+  - `bin/hud.js` — added `performHealthCheck`, `check`, and `repair`/`sync` CLI subcommands
+  - `Sync-AgyHud.ps1` — new standalone PowerShell check & repair automation tool
+  - `tests/hud_checks_and_corrections.test.js` — new 10-test fault injection & self-healing test suite
+  - `tests/hud_engine.test.js`, `tests/hud_gui.test.ps1`, `tests/hud_web_gui.test.js` — dynamic path resolution hardening
+  - `tests/run_all_hud_tests.ps1` — expanded to 5-suite master runner
+  - `install.ps1` — updated to v2.3.0 dual-target deployment with automated health check
+  - `~/.gemini/scripts/*`, `~/.gemini/hud/*` — synchronized to 100% SHA-256 parity
+  - `package.json`, `CHANGELOG.md` — bumped to 2.3.0
+
+* **Validation Status:**
+  - **AGY HUD 5-Suite Master Tests:** 100% Pass (31/31 assertions across 5 suites).
+  - **PowerShell Profile Tests:** 100% Pass (13/13 alias tests, 4/4 benchmark tests).
+  - **SHA-256 Runtime Parity:** Verified 0 drift across all active directories.
+
+---
+
 ### [SESSION LOG: 2026-08-18 (Part 2 - Dedicated Subsystem Reorganization, WinForms Fixes, Branding & Testing Suite)]
 * **Completed Objectives:**
   - Migrated HUD subsystem into dedicated `~/.gemini/hud/` architecture with multi-tier candidate resolution (`process.env.HUD_CONFIG_PATH` $\rightarrow$ `~/.gemini/hud/` $\rightarrow$ `~/.gemini/` $\rightarrow$ sibling paths).

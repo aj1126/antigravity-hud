@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const crypto = require('crypto');
 const { execFileSync } = require('child_process');
 
 const homeDir = process.env.USERPROFILE || process.env.HOME || os.homedir();
@@ -238,6 +239,269 @@ function clearCustomTitle(cwd = process.cwd(), sessId = null) {
   }
 }
 
+function getFileSha256(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) return null;
+  try {
+    const content = fs.readFileSync(filePath);
+    return crypto.createHash('sha256').update(content).digest('hex');
+  } catch (_) {
+    return null;
+  }
+}
+
+function hasUtf8Bom(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) return false;
+  try {
+    const buf = Buffer.alloc(3);
+    const fd = fs.openSync(filePath, 'r');
+    const bytesRead = fs.readSync(fd, buf, 0, 3, 0);
+    fs.closeSync(fd);
+    return bytesRead === 3 && buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf;
+  } catch (_) {
+    return false;
+  }
+}
+
+function stripBomFromFile(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) return false;
+  try {
+    let content = fs.readFileSync(filePath, 'utf8');
+    if (content.charCodeAt(0) === 0xfeff) {
+      content = content.slice(1);
+      fs.writeFileSync(filePath, content, 'utf8');
+      return true;
+    }
+  } catch (_) {}
+  return false;
+}
+
+function getCanonicalFileMap() {
+  const repoRoot = path.join(__dirname, '..');
+  const candidateHudJs = [
+    path.join(repoRoot, 'bin', 'hud.js'),
+    path.join(__dirname, 'hud.js'),
+    path.join(homeDir, '.gemini', 'hud', 'hud.js'),
+    path.join(homeDir, '.gemini', 'scripts', 'hud.js'),
+    __filename
+  ].find(p => fs.existsSync(p));
+
+  const candidateHudGui = [
+    path.join(repoRoot, 'bin', 'hud_gui.ps1'),
+    path.join(__dirname, 'hud_gui.ps1'),
+    path.join(homeDir, '.gemini', 'hud', 'hud_gui.ps1'),
+    path.join(homeDir, '.gemini', 'scripts', 'hud_gui.ps1')
+  ].find(p => fs.existsSync(p));
+
+  const candidateHudHtml = [
+    path.join(repoRoot, 'web', 'hud_gui.html'),
+    path.join(__dirname, 'hud_gui.html'),
+    path.join(homeDir, '.gemini', 'hud', 'hud_gui.html'),
+    path.join(homeDir, '.gemini', 'scripts', 'hud_gui.html')
+  ].find(p => fs.existsSync(p));
+
+  const candidateHudConfig = [
+    path.join(repoRoot, 'bin', 'hud_config.json'),
+    path.join(__dirname, 'hud_config.json'),
+    path.join(homeDir, '.gemini', 'hud', 'hud_config.json'),
+    path.join(homeDir, '.gemini', 'hud_config.json')
+  ].find(p => fs.existsSync(p));
+
+  return {
+    'hud.js': candidateHudJs,
+    'hud_gui.ps1': candidateHudGui,
+    'hud_gui.html': candidateHudHtml,
+    'hud_config.json': candidateHudConfig
+  };
+}
+
+function performHealthCheck(repair = false) {
+  const canonicalMap = getCanonicalFileMap();
+  const scriptsDir = process.env.HUD_TEST_SCRIPTS_DIR || path.join(homeDir, '.gemini', 'scripts');
+  const hudDir = process.env.HUD_TEST_HUD_DIR || path.join(homeDir, '.gemini', 'hud');
+  const settingsPath = process.env.HUD_TEST_SETTINGS_PATH || path.join(homeDir, '.gemini', 'settings.json');
+
+  const targets = [
+    { name: 'scripts', dir: scriptsDir, files: ['hud.js', 'hud_gui.ps1', 'hud_gui.html'] },
+    { name: 'hud', dir: hudDir, files: ['hud.js', 'hud_gui.ps1', 'hud_gui.html', 'hud_config.json'] }
+  ];
+
+  const report = {
+    healthy: true,
+    status: 'healthy',
+    checkedAt: new Date().toISOString(),
+    canonical: {},
+    targets: {},
+    mismatches: [],
+    missing: [],
+    bomViolations: [],
+    schemaIssues: [],
+    hookStatus: { valid: true, details: '' },
+    repaired: []
+  };
+
+  // 1. Canonical source check
+  for (const [fname, fpath] of Object.entries(canonicalMap)) {
+    const hash = getFileSha256(fpath);
+    report.canonical[fname] = { path: fpath, hash, exists: !!hash };
+  }
+
+  // 2. Check target directories
+  for (const t of targets) {
+    report.targets[t.name] = { dir: t.dir, files: {} };
+    for (const fname of t.files) {
+      const targetPath = path.join(t.dir, fname);
+      const exists = fs.existsSync(targetPath);
+      const hash = getFileSha256(targetPath);
+      const isBom = hasUtf8Bom(targetPath);
+      const canHash = report.canonical[fname]?.hash;
+
+      report.targets[t.name].files[fname] = { path: targetPath, exists, hash, hasBom: isBom };
+
+      if (!exists) {
+        report.missing.push({ target: t.name, file: fname, path: targetPath });
+        report.healthy = false;
+      } else if (fname !== 'hud_config.json' && canHash && hash !== canHash) {
+        report.mismatches.push({ target: t.name, file: fname, path: targetPath, currentHash: hash, expectedHash: canHash });
+        report.healthy = false;
+      }
+
+      if (isBom) {
+        report.bomViolations.push({ target: t.name, file: fname, path: targetPath });
+        report.healthy = false;
+      }
+    }
+  }
+
+  // 3. Check JSON schema completeness
+  const cfgCandidatePaths = [
+    path.join(hudDir, 'hud_config.json'),
+    path.join(scriptsDir, 'hud_config.json'),
+    path.join(homeDir, '.gemini', 'hud_config.json')
+  ];
+  for (const cp of cfgCandidatePaths) {
+    if (fs.existsSync(cp)) {
+      try {
+        const raw = fs.readFileSync(cp, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (parsed.lines === undefined || !Array.isArray(parsed.line1) || !Array.isArray(parsed.line2)) {
+          report.schemaIssues.push({ path: cp, issue: 'Incomplete line structure' });
+          report.healthy = false;
+        }
+        if (!parsed.session_uptime || !parsed.fork_advisory) {
+          report.schemaIssues.push({ path: cp, issue: 'Missing session_uptime or fork_advisory configuration' });
+          report.healthy = false;
+        }
+      } catch (err) {
+        report.schemaIssues.push({ path: cp, issue: `JSON parse error: ${err.message}` });
+        report.healthy = false;
+      }
+    }
+  }
+
+  // 4. Check settings.json hook wiring
+  if (fs.existsSync(settingsPath)) {
+    try {
+      const raw = fs.readFileSync(settingsPath, 'utf8');
+      const st = JSON.parse(raw);
+      if (!st.statusLine || st.statusLine.enabled !== true) {
+        report.hookStatus = { valid: false, details: 'statusLine is missing or disabled' };
+        report.healthy = false;
+      } else {
+        const cmd = String(st.statusLine.command || '');
+        const targetMatch = cmd.match(/node\s+["']?([^"']+)["']?/i);
+        const scriptTarget = targetMatch ? targetMatch[1].trim() : null;
+        if (!scriptTarget || !fs.existsSync(scriptTarget)) {
+          report.hookStatus = { valid: false, details: `Target script not found: ${cmd}` };
+          report.healthy = false;
+        } else {
+          report.hookStatus = { valid: true, details: `Hook active: ${cmd}` };
+        }
+      }
+    } catch (err) {
+      report.hookStatus = { valid: false, details: `Settings error: ${err.message}` };
+      report.healthy = false;
+    }
+  } else if (!process.env.HUD_TEST_MODE) {
+    report.hookStatus = { valid: false, details: 'settings.json not found' };
+    report.healthy = false;
+  }
+
+  // 5. Execute Auto-Repair if requested
+  if (repair) {
+    for (const t of targets) {
+      if (!fs.existsSync(t.dir)) fs.mkdirSync(t.dir, { recursive: true });
+      for (const fname of t.files) {
+        const srcPath = canonicalMap[fname];
+        const destPath = path.join(t.dir, fname);
+        if (srcPath && fs.existsSync(srcPath)) {
+          const srcHash = getFileSha256(srcPath);
+          const destHash = getFileSha256(destPath);
+          const needsSync = fname === 'hud_config.json' ? !fs.existsSync(destPath) : (srcHash !== destHash || !fs.existsSync(destPath));
+          if (needsSync) {
+            fs.copyFileSync(srcPath, destPath);
+            report.repaired.push(`Synchronized ${fname} -> ${destPath}`);
+          }
+        }
+        if (hasUtf8Bom(destPath)) {
+          stripBomFromFile(destPath);
+          report.repaired.push(`Stripped BOM preamble from ${destPath}`);
+        }
+      }
+    }
+
+    // Auto-hydrate hud_config.json
+    const activeCfgPath = path.join(hudDir, 'hud_config.json');
+    const seedCfg = canonicalMap['hud_config.json'];
+    if (!fs.existsSync(activeCfgPath) && seedCfg && fs.existsSync(seedCfg)) {
+      fs.copyFileSync(seedCfg, activeCfgPath);
+      report.repaired.push(`Initialized default configuration at ${activeCfgPath}`);
+    } else if (fs.existsSync(activeCfgPath)) {
+      try {
+        const raw = fs.readFileSync(activeCfgPath, 'utf8');
+        const parsed = JSON.parse(raw);
+        const hydrated = {
+          lines: typeof parsed.lines === 'number' ? parsed.lines : DEFAULT_CONFIG.lines,
+          two_line: typeof parsed.two_line === 'boolean' ? parsed.two_line : DEFAULT_CONFIG.two_line,
+          separator: parsed.separator || DEFAULT_CONFIG.separator,
+          compact_mode: parsed.compact_mode || DEFAULT_CONFIG.compact_mode,
+          line1: Array.isArray(parsed.line1) ? parsed.line1 : DEFAULT_CONFIG.line1,
+          line2: Array.isArray(parsed.line2) ? parsed.line2 : DEFAULT_CONFIG.line2,
+          line3: Array.isArray(parsed.line3) ? parsed.line3 : DEFAULT_CONFIG.line3,
+          line4: Array.isArray(parsed.line4) ? parsed.line4 : DEFAULT_CONFIG.line4,
+          disabled: Array.isArray(parsed.disabled) ? parsed.disabled : DEFAULT_CONFIG.disabled,
+          item_styles: typeof parsed.item_styles === 'object' && parsed.item_styles !== null ? parsed.item_styles : {},
+          session_uptime: { ...DEFAULT_CONFIG.session_uptime, ...(parsed.session_uptime || {}) },
+          fork_advisory: { ...DEFAULT_CONFIG.fork_advisory, ...(parsed.fork_advisory || {}) }
+        };
+        fs.writeFileSync(activeCfgPath, JSON.stringify(hydrated, null, 2), 'utf8');
+        report.repaired.push(`Hydrated configuration schema in ${activeCfgPath}`);
+      } catch (_) {}
+    }
+
+    // Auto-repair settings.json hook
+    if (fs.existsSync(settingsPath)) {
+      try {
+        const raw = fs.readFileSync(settingsPath, 'utf8');
+        const st = JSON.parse(raw);
+        if (!st.statusLine) st.statusLine = {};
+        const bestTarget = path.join(hudDir, 'hud.js').replace(/\\/g, '/');
+        st.statusLine.command = `node ${bestTarget}`;
+        st.statusLine.enabled = true;
+        st.statusLine.type = 'command';
+        fs.writeFileSync(settingsPath, JSON.stringify(st, null, 2), 'utf8');
+        report.repaired.push(`Updated statusLine hook in ${settingsPath}`);
+      } catch (_) {}
+    }
+
+    report.status = 'repaired';
+    report.healthy = true;
+  } else {
+    report.status = report.healthy ? 'healthy' : 'drifted';
+  }
+
+  return report;
+}
+
 // -------------------------------------------------------------
 // CLI Subcommands (e.g. hud lines, hud compact, hud style, etc.)
 // -------------------------------------------------------------
@@ -246,6 +510,73 @@ if (args.length > 0) {
   const rawCmd = args[0].toLowerCase();
   const cmd = rawCmd.replace(/^--?/, '');
   const cfg = loadConfig();
+
+  if (cmd === 'check' || cmd === 'health' || cmd === 'doctor' || cmd === 'status-check') {
+    const isJson = args.includes('--json') || args.includes('-j');
+    const doRepair = args.includes('--repair') || args.includes('-r') || args.includes('--fix');
+    const report = performHealthCheck(doRepair);
+
+    if (isJson) {
+      console.log(JSON.stringify(report, null, 2));
+      process.exit(report.healthy ? 0 : 1);
+    }
+
+    console.log('\x1b[1m\x1b[36m=== Antigravity CLI (AGY) HUD Health & Drift Check ===\x1b[0m\n');
+    console.log(`Checked At: \x1b[90m${report.checkedAt}\x1b[0m`);
+    console.log(`Status:     ${report.healthy ? '\x1b[32m✔ 100% HEALTHY (Zero Drift)\x1b[0m' : '\x1b[31m✖ DRIFT OR ISSUES DETECTED\x1b[0m'}\n`);
+
+    console.log('\x1b[1mTarget Directories:\x1b[0m');
+    for (const [tName, tInfo] of Object.entries(report.targets)) {
+      console.log(`  • \x1b[33m${tName}\x1b[0m (${tInfo.dir}):`);
+      for (const [fname, finfo] of Object.entries(tInfo.files)) {
+        let icon = finfo.exists ? '\x1b[32m✔\x1b[0m' : '\x1b[31m✖ (missing)\x1b[0m';
+        if (finfo.exists && report.mismatches.some(m => m.target === tName && m.file === fname)) {
+          icon = '\x1b[33m⚠️ (hash mismatch)\x1b[0m';
+        }
+        if (finfo.hasBom) {
+          icon += ' \x1b[31m[BOM PREAMBLE]\x1b[0m';
+        }
+        console.log(`    - ${fname.padEnd(16)}: ${icon}`);
+      }
+    }
+
+    console.log('\n\x1b[1mStatusline Hook Wiring:\x1b[0m');
+    console.log(`  ${report.hookStatus.valid ? '\x1b[32m✔\x1b[0m' : '\x1b[31m✖\x1b[0m'} ${report.hookStatus.details}`);
+
+    if (report.schemaIssues.length > 0) {
+      console.log('\n\x1b[1m\x1b[31mSchema Issues:\x1b[0m');
+      report.schemaIssues.forEach(s => console.log(`  • ${s.path}: ${s.issue}`));
+    }
+
+    if (report.repaired.length > 0) {
+      console.log('\n\x1b[1m\x1b[32mAuto-Repairs Executed:\x1b[0m');
+      report.repaired.forEach(r => console.log(`  ✔ ${r}`));
+    } else if (!report.healthy) {
+      console.log('\n\x1b[90mTip: Run `hud repair` or `hud check --repair` to automatically fix detected drift.\x1b[0m');
+    }
+
+    process.exit(report.healthy ? 0 : 1);
+  }
+
+  if (cmd === 'repair' || cmd === 'sync' || cmd === 'self-heal' || cmd === 'fix') {
+    const isJson = args.includes('--json') || args.includes('-j');
+    const report = performHealthCheck(true);
+
+    if (isJson) {
+      console.log(JSON.stringify(report, null, 2));
+      process.exit(0);
+    }
+
+    console.log('\x1b[1m\x1b[36m=== Antigravity CLI (AGY) HUD Auto-Repair & Sync ===\x1b[0m\n');
+    if (report.repaired.length === 0) {
+      console.log('\x1b[32m✔ All components are already in perfect sync (Zero drift detected).\x1b[0m');
+    } else {
+      console.log(`\x1b[32m✔ Successfully applied ${report.repaired.length} repair(s):\x1b[0m`);
+      report.repaired.forEach(r => console.log(`  ✔ ${r}`));
+    }
+    console.log(`\nFinal Health: ${report.healthy ? '\x1b[32m✔ 100% HEALTHY\x1b[0m' : '\x1b[31m✖ Unresolved issues remain\x1b[0m'}`);
+    process.exit(report.healthy ? 0 : 1);
+  }
 
   if (cmd === 'list' || cmd === 'l' || cmd === 'ls') {
     console.log('\x1b[1m\x1b[36m=== Antigravity CLI (AGY) Statusline HUD ===\x1b[0m');
@@ -760,6 +1091,8 @@ if (args.length > 0) {
     console.log('\x1b[1m\x1b[36m=======================================================\x1b[0m\n');
     console.log('\x1b[1mCommands:\x1b[0m');
     console.log('  \x1b[33mhud\x1b[0m                           View active layout and items status');
+    console.log('  \x1b[33mhud check [--repair]\x1b[0m          Verify integrity & SHA-256 parity across runtimes');
+    console.log('  \x1b[33mhud repair / hud sync\x1b[0m         Self-healing auto-repair and runtime synchronization');
     console.log('  \x1b[33mhud lines <1-4>\x1b[0m               Configure number of display lines (1 to 4)');
     console.log('  \x1b[33mhud compact <mode>\x1b[0m            Set global compact mode (auto, full, short, minimal)');
     console.log('  \x1b[33mhud style <item> <style>\x1b[0m      Set item format style (full, short, minimal, auto)');

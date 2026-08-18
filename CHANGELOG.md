@@ -4,6 +4,28 @@ All notable changes to **Antigravity HUD** (`antigravity-hud`) are documented in
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2026-08-18
+
+### 🛡️ Automated Checks, Drift Detection & Self-Healing Runtime Architecture
+- **Active Version Upgrade (`~/.gemini/scripts/`)**:
+  - Upgraded active runtime scripts in `~/.gemini/scripts/` (`hud.js`, `hud_gui.ps1`, `hud_gui.html`) to full v2.3.0 parity with `~/.gemini/hud/` and source repository.
+- **Automated Health Check & Drift Detection (`hud check`)**:
+  - Implemented SHA-256 integrity verification across runtime targets (`~/.gemini/scripts/` and `~/.gemini/hud/`).
+  - Added UTF-8 BOM preamble detection (`\ufeff`) to prevent Go/Node JSON parsing errors.
+  - Added configuration schema validation and statusline hook verification.
+- **Self-Healing Auto-Repair Engine (`hud repair` / `hud sync` / `Sync-AgyHud.ps1`)**:
+  - Atomically repairs drifted files and restores missing runtime components.
+  - Automatically strips BOM preambles and safely hydrates missing schema properties without destroying user custom overrides.
+  - Restores broken statusline settings hooks.
+- **Master Test Suite Expansion (5/5 Matrix)**:
+  - Added `tests/hud_checks_and_corrections.test.js` implementing a 10-test fault injection and auto-repair validation matrix with 100% pass rate.
+  - Hardened path resolution across all test suites to dynamically support repository and flat subsystem execution layouts.
+- **Installer Hardening (`install.ps1`)**:
+  - Multi-target deployment ensuring dual-path synchronization across `~/.gemini/scripts/` and `~/.gemini/hud/`.
+  - Added automated post-install health verification.
+
+---
+
 ## [2.2.0] - 2026-08-18
 
 ### 🚀 Major Architectural Reorganization, Bug Fixes & Automated Testing Suite

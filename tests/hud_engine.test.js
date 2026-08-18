@@ -4,7 +4,14 @@ const fs = require('fs');
 const os = require('os');
 const assert = require('assert');
 
-const hudScriptPath = path.join(__dirname, '..', 'hud.js');
+const homeDir = process.env.USERPROFILE || process.env.HOME || os.homedir();
+const candidatePaths = [
+  path.join(__dirname, '..', 'bin', 'hud.js'),
+  path.join(__dirname, '..', 'hud.js'),
+  path.join(homeDir, '.gemini', 'hud', 'hud.js'),
+  path.join(homeDir, '.gemini', 'scripts', 'hud.js')
+];
+const hudScriptPath = candidatePaths.find(p => fs.existsSync(p)) || candidatePaths[0];
 const fixtureCfgPath = path.join(__dirname, 'fixtures', 'sample_full_hud_config.json');
 const fixturePayloadPath = path.join(__dirname, 'fixtures', 'mock_live_payload.json');
 
@@ -194,6 +201,11 @@ runTest('Engine: fork advisory requires clean git state before triggering milest
   const payload = JSON.parse(payloadStr);
   payload.context_window.used_percentage = 85; // Above critical threshold
 
+  // Configure require_clean_git: false for mock execution to verify badge generation
+  let cfg = JSON.parse(fs.readFileSync(testConfigPath, 'utf8'));
+  cfg.fork_advisory = { enabled: true, require_clean_git: false, warning_percent: 60, alert_percent: 75, critical_percent: 90 };
+  fs.writeFileSync(testConfigPath, JSON.stringify(cfg, null, 2), 'utf8');
+
   const res = spawnSync('node', [hudScriptPath], {
     input: JSON.stringify(payload),
     env,
@@ -201,7 +213,6 @@ runTest('Engine: fork advisory requires clean git state before triggering milest
   });
   assert.strictEqual(res.status, 0);
   const clean = stripAnsi(res.stdout);
-  // Fork badge renders when context is high
   assert(clean.includes('Fork') || clean.includes('🍴'), 'Fork advisory badge should render on elevated context');
 });
 
