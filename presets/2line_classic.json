@@ -1,0 +1,40 @@
+{
+  "name": "2-Line Classic",
+  "description": "Standard 2-tier balanced statusline with context and quota telemetry",
+  "lines": 2,
+  "two_line": true,
+  "separator": "│",
+  "compact_mode": "auto",
+  "line1": [
+    "workspace",
+    "git_status",
+    "model",
+    "state",
+    "session"
+  ],
+  "line2": [
+    "context",
+    "quota_5h",
+    "quota_weekly",
+    "mcp",
+    "tasks",
+    "artifacts"
+  ],
+  "line3": [],
+  "line4": [],
+  "disabled": [],
+  "item_styles": {},
+  "session_uptime": {
+    "show_seconds": true
+  },
+  "fork_advisory": {
+    "enabled": true,
+    "require_clean_git": true,
+    "warning_percent": 60,
+    "alert_percent": 75,
+    "critical_percent": 90,
+    "step_warning": 300,
+    "step_alert": 500,
+    "step_critical": 800
+  }
+}

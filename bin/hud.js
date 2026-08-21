@@ -139,12 +139,20 @@ function loadConfig() {
 
 function saveConfig(cfg) {
   let target = getConfigPath();
-  if (!fs.existsSync(target)) {
-    target = path.join(homeDir, '.gemini', 'hud', 'hud_config.json');
+  if (!target || !fs.existsSync(target)) {
+    target = path.join(homeDir, '.gemini', 'scripts', 'hud_config.json');
   }
   const dir = path.dirname(target);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(target, JSON.stringify(cfg, null, 2), 'utf8');
+
+  // Dual-sync to ~/.gemini/hud/hud_config.json if directory exists
+  const hudMirror = path.join(homeDir, '.gemini', 'hud', 'hud_config.json');
+  if (target !== hudMirror && fs.existsSync(path.dirname(hudMirror))) {
+    try {
+      fs.writeFileSync(hudMirror, JSON.stringify(cfg, null, 2), 'utf8');
+    } catch (_) {}
+  }
 }
 
 function resolveItemStyle(itemKey, cfg, terminalWidth) {
@@ -277,8 +285,366 @@ function stripBomFromFile(filePath) {
   return false;
 }
 
+function getRepoPath() {
+  if (process.env.HUD_TEST_REPO_DIR && fs.existsSync(process.env.HUD_TEST_REPO_DIR)) {
+    return process.env.HUD_TEST_REPO_DIR;
+  }
+  if (process.env.ANTIGRAVITY_HUD_REPO && fs.existsSync(process.env.ANTIGRAVITY_HUD_REPO)) {
+    return process.env.ANTIGRAVITY_HUD_REPO;
+  }
+  try {
+    const cfg = loadConfig();
+    if (cfg.repo_path && fs.existsSync(cfg.repo_path)) {
+      return cfg.repo_path;
+    }
+  } catch (_) {}
+
+  const defaultPath = path.join('B:', 'Repos', 'antigravity-hud');
+  if (fs.existsSync(defaultPath)) {
+    return defaultPath;
+  }
+
+  // Walk up from __dirname
+  let curr = __dirname;
+  for (let i = 0; i < 5; i++) {
+    if (fs.existsSync(path.join(curr, '.git')) && fs.existsSync(path.join(curr, 'package.json'))) {
+      return curr;
+    }
+    const parent = path.dirname(curr);
+    if (parent === curr) break;
+    curr = parent;
+  }
+
+  return defaultPath;
+}
+
+function getBidirectionalMapping(repoRoot, scriptsDir) {
+  const base = [
+    { relRepo: path.join('bin', 'hud.js'), relActive: 'hud.js', type: 'code' },
+    { relRepo: path.join('bin', 'hud_gui.ps1'), relActive: 'hud_gui.ps1', type: 'code' },
+    { relRepo: path.join('bin', 'hud_config.json'), relActive: 'hud_config.json', type: 'config' },
+    { relRepo: path.join('web', 'hud_gui.html'), relActive: 'hud_gui.html', type: 'code' },
+    { relRepo: 'Sync-AgyHud.ps1', relActive: 'Sync-AgyHud.ps1', type: 'code' },
+    { relRepo: path.join('hooks', 'post_tool_format.js'), relActive: path.join('hooks', 'post_tool_format.js'), type: 'hook' },
+    { relRepo: path.join('hooks', 'on_session_start.ps1'), relActive: path.join('hooks', 'on_session_start.ps1'), type: 'hook' },
+    { relRepo: path.join('hooks', 'pre_tool_guard.js'), relActive: path.join('hooks', 'pre_tool_guard.js'), type: 'hook' },
+    { relRepo: path.join('hooks', 'on_session_exit.ps1'), relActive: path.join('hooks', 'on_session_exit.ps1'), type: 'hook' }
+  ];
+
+  const presetNames = new Set();
+  const repoPresetsDir = path.join(repoRoot, 'presets');
+  const activePresetsDir = path.join(scriptsDir, 'presets');
+
+  if (fs.existsSync(repoPresetsDir)) {
+    try {
+      fs.readdirSync(repoPresetsDir).filter(f => f.endsWith('.json')).forEach(f => presetNames.add(f));
+    } catch (_) {}
+  }
+  if (fs.existsSync(activePresetsDir)) {
+    try {
+      fs.readdirSync(activePresetsDir).filter(f => f.endsWith('.json')).forEach(f => presetNames.add(f));
+    } catch (_) {}
+  }
+
+  for (const pf of presetNames) {
+    base.push({
+      relRepo: path.join('presets', pf),
+      relActive: path.join('presets', pf),
+      type: 'preset'
+    });
+  }
+
+  return base.map(m => ({
+    ...m,
+    repoPath: path.join(repoRoot, m.relRepo),
+    activePath: path.join(scriptsDir, m.relActive)
+  }));
+}
+
+function performDiff(customRepoRoot = null) {
+  const repoRoot = customRepoRoot || getRepoPath();
+  const scriptsDir = process.env.HUD_TEST_SCRIPTS_DIR || path.join(homeDir, '.gemini', 'scripts');
+  const mappings = getBidirectionalMapping(repoRoot, scriptsDir);
+
+  const diffReport = {
+    repoRoot,
+    scriptsDir,
+    checkedAt: new Date().toISOString(),
+    inSync: true,
+    items: []
+  };
+
+  for (const m of mappings) {
+    const activeExists = fs.existsSync(m.activePath);
+    const repoExists = fs.existsSync(m.repoPath);
+    const activeHash = activeExists ? getFileSha256(m.activePath) : null;
+    const repoHash = repoExists ? getFileSha256(m.repoPath) : null;
+    const activeStat = activeExists ? fs.statSync(m.activePath) : null;
+    const repoStat = repoExists ? fs.statSync(m.repoPath) : null;
+
+    let status = 'IDENTICAL';
+    if (!activeExists && !repoExists) {
+      status = 'MISSING_BOTH';
+      diffReport.inSync = false;
+    } else if (!activeExists) {
+      status = 'REPO_ONLY';
+      diffReport.inSync = false;
+    } else if (!repoExists) {
+      status = 'ACTIVE_ONLY';
+      diffReport.inSync = false;
+    } else if (activeHash !== repoHash) {
+      diffReport.inSync = false;
+      if (activeStat && repoStat) {
+        if (activeStat.mtimeMs > repoStat.mtimeMs) {
+          status = 'ACTIVE_NEWER';
+        } else if (repoStat.mtimeMs > activeStat.mtimeMs) {
+          status = 'REPO_NEWER';
+        } else {
+          status = 'MODIFIED_SAME_TIME';
+        }
+      } else {
+        status = 'MODIFIED';
+      }
+    }
+
+    diffReport.items.push({
+      relActive: m.relActive,
+      relRepo: m.relRepo,
+      activePath: m.activePath,
+      repoPath: m.repoPath,
+      type: m.type,
+      activeExists,
+      repoExists,
+      activeHash,
+      repoHash,
+      activeMtime: activeStat ? activeStat.mtime.toISOString() : null,
+      repoMtime: repoStat ? repoStat.mtime.toISOString() : null,
+      status
+    });
+  }
+
+  return diffReport;
+}
+
+function performBackup(options = {}) {
+  const force = !!options.force;
+  const repoRoot = options.repoRoot || getRepoPath();
+  const scriptsDir = process.env.HUD_TEST_SCRIPTS_DIR || path.join(homeDir, '.gemini', 'scripts');
+  const mappings = getBidirectionalMapping(repoRoot, scriptsDir);
+
+  const report = {
+    success: true,
+    repoRoot,
+    scriptsDir,
+    backedUp: [],
+    skipped: [],
+    conflicts: [],
+    errors: []
+  };
+
+  for (const m of mappings) {
+    if (!fs.existsSync(m.activePath)) {
+      report.skipped.push({ file: m.relActive, reason: 'Active file does not exist' });
+      continue;
+    }
+
+    const activeHash = getFileSha256(m.activePath);
+    const repoExists = fs.existsSync(m.repoPath);
+    const repoHash = repoExists ? getFileSha256(m.repoPath) : null;
+
+    if (repoExists && activeHash === repoHash) {
+      report.skipped.push({ file: m.relActive, reason: 'Identical hash' });
+      continue;
+    }
+
+    if (repoExists && !force) {
+      const activeStat = fs.statSync(m.activePath);
+      const repoStat = fs.statSync(m.repoPath);
+      if (repoStat.mtimeMs > activeStat.mtimeMs + 2000) {
+        report.conflicts.push({
+          file: m.relActive,
+          repoPath: m.repoPath,
+          repoMtime: repoStat.mtime.toISOString(),
+          activeMtime: activeStat.mtime.toISOString(),
+          details: 'Repo file is newer than active file. Use --force to overwrite.'
+        });
+        report.success = false;
+        continue;
+      }
+    }
+
+    try {
+      const targetDir = path.dirname(m.repoPath);
+      if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+
+      fs.copyFileSync(m.activePath, m.repoPath);
+
+      if (hasUtf8Bom(m.repoPath)) {
+        stripBomFromFile(m.repoPath);
+      }
+
+      report.backedUp.push({
+        active: m.activePath,
+        repo: m.repoPath,
+        file: m.relRepo
+      });
+    } catch (err) {
+      report.errors.push({ file: m.relActive, error: err.message });
+      report.success = false;
+    }
+  }
+
+  return report;
+}
+
+function performDeploy(options = {}) {
+  const force = !!options.force;
+  const repoRoot = options.repoRoot || getRepoPath();
+  const scriptsDir = process.env.HUD_TEST_SCRIPTS_DIR || path.join(homeDir, '.gemini', 'scripts');
+  const hudDir = process.env.HUD_TEST_HUD_DIR || path.join(homeDir, '.gemini', 'hud');
+  const mappings = getBidirectionalMapping(repoRoot, scriptsDir);
+
+  const report = {
+    success: true,
+    repoRoot,
+    deployed: [],
+    skipped: [],
+    conflicts: [],
+    errors: []
+  };
+
+  for (const m of mappings) {
+    if (!fs.existsSync(m.repoPath)) {
+      report.skipped.push({ file: m.relRepo, reason: 'Repo source file does not exist' });
+      continue;
+    }
+
+    const repoHash = getFileSha256(m.repoPath);
+    const destTargets = [m.activePath, path.join(hudDir, m.relActive)];
+
+    for (const dest of destTargets) {
+      const destExists = fs.existsSync(dest);
+      const destHash = destExists ? getFileSha256(dest) : null;
+
+      if (destExists && repoHash === destHash) {
+        continue;
+      }
+
+      if (destExists && !force) {
+        const repoStat = fs.statSync(m.repoPath);
+        const destStat = fs.statSync(dest);
+        if (destStat.mtimeMs > repoStat.mtimeMs + 2000) {
+          report.conflicts.push({
+            file: m.relRepo,
+            dest,
+            destMtime: destStat.mtime.toISOString(),
+            repoMtime: repoStat.mtime.toISOString(),
+            details: 'Active file is newer than repo file. Use --force to overwrite.'
+          });
+          report.success = false;
+          continue;
+        }
+      }
+
+      try {
+        const destDir = path.dirname(dest);
+        if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
+        fs.copyFileSync(m.repoPath, dest);
+        if (hasUtf8Bom(dest)) stripBomFromFile(dest);
+        report.deployed.push({ src: m.repoPath, dest });
+      } catch (err) {
+        report.errors.push({ file: m.relRepo, dest, error: err.message });
+        report.success = false;
+      }
+    }
+  }
+
+  performHealthCheck(true);
+
+  return report;
+}
+
+function getPresetsDirs() {
+  const repoPresets = path.join(getRepoPath(), 'presets');
+  const scriptsPresets = path.join(process.env.HUD_TEST_SCRIPTS_DIR || path.join(homeDir, '.gemini', 'scripts'), 'presets');
+  const hudPresets = path.join(process.env.HUD_TEST_HUD_DIR || path.join(homeDir, '.gemini', 'hud'), 'presets');
+  return { repoPresets, scriptsPresets, hudPresets };
+}
+
+function listAvailablePresets() {
+  const { repoPresets, scriptsPresets } = getPresetsDirs();
+  const found = new Map();
+
+  const searchDirs = [scriptsPresets, repoPresets].filter(d => fs.existsSync(d));
+  for (const d of searchDirs) {
+    try {
+      const files = fs.readdirSync(d).filter(f => f.endsWith('.json'));
+      for (const f of files) {
+        const id = f.replace(/\.json$/, '');
+        if (!found.has(id)) {
+          try {
+            const content = JSON.parse(fs.readFileSync(path.join(d, f), 'utf8'));
+            found.set(id, {
+              id,
+              name: content.name || id,
+              description: content.description || '',
+              lines: content.lines || 2,
+              path: path.join(d, f)
+            });
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+  }
+  return Array.from(found.values());
+}
+
+function saveCustomPreset(presetName, currentCfg) {
+  const cleanName = presetName.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+  const { repoPresets, scriptsPresets, hudPresets } = getPresetsDirs();
+
+  const presetPayload = {
+    name: presetName,
+    description: `Saved preset created on ${new Date().toISOString().split('T')[0]}`,
+    ...currentCfg
+  };
+
+  const targetDirs = [scriptsPresets, hudPresets, repoPresets];
+  for (const d of targetDirs) {
+    try {
+      if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+      fs.writeFileSync(path.join(d, `${cleanName}.json`), JSON.stringify(presetPayload, null, 2), 'utf8');
+    } catch (_) {}
+  }
+  return cleanName;
+}
+
+function loadCustomPreset(presetName) {
+  const cleanName = presetName.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+  const { scriptsPresets, repoPresets } = getPresetsDirs();
+
+  const candidates = [
+    path.join(scriptsPresets, `${cleanName}.json`),
+    path.join(repoPresets, `${cleanName}.json`),
+    path.join(scriptsPresets, `${presetName}.json`),
+    path.join(repoPresets, `${presetName}.json`)
+  ];
+
+  const matched = candidates.find(p => fs.existsSync(p));
+  if (!matched) return null;
+
+  try {
+    const raw = fs.readFileSync(matched, 'utf8');
+    const loaded = JSON.parse(raw);
+    saveConfig(loaded);
+    return loaded;
+  } catch (err) {
+    return null;
+  }
+}
+
 function getCanonicalFileMap() {
-  const repoRoot = path.join(__dirname, '..');
+  const repoRoot = getRepoPath();
   const candidateHudJs = [
     path.join(repoRoot, 'bin', 'hud.js'),
     path.join(__dirname, 'hud.js'),
@@ -305,7 +671,7 @@ function getCanonicalFileMap() {
     path.join(repoRoot, 'bin', 'hud_config.json'),
     path.join(__dirname, 'hud_config.json'),
     path.join(homeDir, '.gemini', 'hud', 'hud_config.json'),
-    path.join(homeDir, '.gemini', 'hud_config.json')
+    path.join(homeDir, '.gemini', 'scripts', 'hud_config.json')
   ].find(p => fs.existsSync(p));
 
   return {
@@ -323,7 +689,7 @@ function performHealthCheck(repair = false) {
   const settingsPath = process.env.HUD_TEST_SETTINGS_PATH || path.join(homeDir, '.gemini', 'settings.json');
 
   const targets = [
-    { name: 'scripts', dir: scriptsDir, files: ['hud.js', 'hud_gui.ps1', 'hud_gui.html'] },
+    { name: 'scripts', dir: scriptsDir, files: ['hud.js', 'hud_gui.ps1', 'hud_gui.html', 'hud_config.json'] },
     { name: 'hud', dir: hudDir, files: ['hud.js', 'hud_gui.ps1', 'hud_gui.html', 'hud_config.json'] }
   ];
 
@@ -376,8 +742,8 @@ function performHealthCheck(repair = false) {
 
   // 3. Check JSON schema completeness
   const cfgCandidatePaths = [
-    path.join(hudDir, 'hud_config.json'),
     path.join(scriptsDir, 'hud_config.json'),
+    path.join(hudDir, 'hud_config.json'),
     path.join(homeDir, '.gemini', 'hud_config.json')
   ];
   for (const cp of cfgCandidatePaths) {
@@ -451,33 +817,39 @@ function performHealthCheck(repair = false) {
       }
     }
 
-    // Auto-hydrate hud_config.json
-    const activeCfgPath = path.join(hudDir, 'hud_config.json');
+    // Auto-hydrate hud_config.json across targets
+    const cfgPathsToHydrate = [
+      path.join(scriptsDir, 'hud_config.json'),
+      path.join(hudDir, 'hud_config.json')
+    ];
     const seedCfg = canonicalMap['hud_config.json'];
-    if (!fs.existsSync(activeCfgPath) && seedCfg && fs.existsSync(seedCfg)) {
-      fs.copyFileSync(seedCfg, activeCfgPath);
-      report.repaired.push(`Initialized default configuration at ${activeCfgPath}`);
-    } else if (fs.existsSync(activeCfgPath)) {
-      try {
-        const raw = fs.readFileSync(activeCfgPath, 'utf8');
-        const parsed = JSON.parse(raw);
-        const hydrated = {
-          lines: typeof parsed.lines === 'number' ? parsed.lines : DEFAULT_CONFIG.lines,
-          two_line: typeof parsed.two_line === 'boolean' ? parsed.two_line : DEFAULT_CONFIG.two_line,
-          separator: parsed.separator || DEFAULT_CONFIG.separator,
-          compact_mode: parsed.compact_mode || DEFAULT_CONFIG.compact_mode,
-          line1: Array.isArray(parsed.line1) ? parsed.line1 : DEFAULT_CONFIG.line1,
-          line2: Array.isArray(parsed.line2) ? parsed.line2 : DEFAULT_CONFIG.line2,
-          line3: Array.isArray(parsed.line3) ? parsed.line3 : DEFAULT_CONFIG.line3,
-          line4: Array.isArray(parsed.line4) ? parsed.line4 : DEFAULT_CONFIG.line4,
-          disabled: Array.isArray(parsed.disabled) ? parsed.disabled : DEFAULT_CONFIG.disabled,
-          item_styles: typeof parsed.item_styles === 'object' && parsed.item_styles !== null ? parsed.item_styles : {},
-          session_uptime: { ...DEFAULT_CONFIG.session_uptime, ...(parsed.session_uptime || {}) },
-          fork_advisory: { ...DEFAULT_CONFIG.fork_advisory, ...(parsed.fork_advisory || {}) }
-        };
-        fs.writeFileSync(activeCfgPath, JSON.stringify(hydrated, null, 2), 'utf8');
-        report.repaired.push(`Hydrated configuration schema in ${activeCfgPath}`);
-      } catch (_) {}
+
+    for (const activeCfgPath of cfgPathsToHydrate) {
+      if (!fs.existsSync(activeCfgPath) && seedCfg && fs.existsSync(seedCfg)) {
+        fs.copyFileSync(seedCfg, activeCfgPath);
+        report.repaired.push(`Initialized default configuration at ${activeCfgPath}`);
+      } else if (fs.existsSync(activeCfgPath)) {
+        try {
+          const raw = fs.readFileSync(activeCfgPath, 'utf8');
+          const parsed = JSON.parse(raw);
+          const hydrated = {
+            lines: typeof parsed.lines === 'number' ? parsed.lines : DEFAULT_CONFIG.lines,
+            two_line: typeof parsed.two_line === 'boolean' ? parsed.two_line : DEFAULT_CONFIG.two_line,
+            separator: parsed.separator || DEFAULT_CONFIG.separator,
+            compact_mode: parsed.compact_mode || DEFAULT_CONFIG.compact_mode,
+            line1: Array.isArray(parsed.line1) ? parsed.line1 : DEFAULT_CONFIG.line1,
+            line2: Array.isArray(parsed.line2) ? parsed.line2 : DEFAULT_CONFIG.line2,
+            line3: Array.isArray(parsed.line3) ? parsed.line3 : DEFAULT_CONFIG.line3,
+            line4: Array.isArray(parsed.line4) ? parsed.line4 : DEFAULT_CONFIG.line4,
+            disabled: Array.isArray(parsed.disabled) ? parsed.disabled : DEFAULT_CONFIG.disabled,
+            item_styles: typeof parsed.item_styles === 'object' && parsed.item_styles !== null ? parsed.item_styles : {},
+            session_uptime: { ...DEFAULT_CONFIG.session_uptime, ...(parsed.session_uptime || {}) },
+            fork_advisory: { ...DEFAULT_CONFIG.fork_advisory, ...(parsed.fork_advisory || {}) }
+          };
+          fs.writeFileSync(activeCfgPath, JSON.stringify(hydrated, null, 2), 'utf8');
+          report.repaired.push(`Hydrated configuration schema in ${activeCfgPath}`);
+        } catch (_) {}
+      }
     }
 
     // Auto-repair settings.json hook
@@ -512,6 +884,104 @@ if (args.length > 0) {
   const rawCmd = args[0].toLowerCase();
   const cmd = rawCmd.replace(/^--?/, '');
   const cfg = loadConfig();
+
+  if (cmd === 'diff' || cmd === 'status-diff' || cmd === 'repo-diff') {
+    const isJson = args.includes('--json') || args.includes('-j');
+    const diffReport = performDiff();
+
+    if (isJson) {
+      console.log(JSON.stringify(diffReport, null, 2));
+      process.exit(diffReport.inSync ? 0 : 1);
+    }
+
+    console.log('\x1b[1m\x1b[36m=== Antigravity HUD: Active vs Repo Diff Matrix ===\x1b[0m\n');
+    console.log(`Repo Root:   \x1b[33m${diffReport.repoRoot}\x1b[0m`);
+    console.log(`Active Root: \x1b[33m${diffReport.scriptsDir}\x1b[0m`);
+    console.log(`Checked At:  \x1b[90m${diffReport.checkedAt}\x1b[0m`);
+    console.log(`Status:      ${diffReport.inSync ? '\x1b[32m✔ 100% IN SYNC\x1b[0m' : '\x1b[33m⚠️ DIVERGENCE DETECTED\x1b[0m'}\n`);
+
+    console.log('\x1b[1mFile Status Table:\x1b[0m');
+    for (const item of diffReport.items) {
+      let statusLabel = '\x1b[32m[IDENTICAL]\x1b[0m';
+      if (item.status === 'ACTIVE_NEWER') statusLabel = '\x1b[33m[ACTIVE NEWER]\x1b[0m';
+      else if (item.status === 'REPO_NEWER') statusLabel = '\x1b[35m[REPO NEWER]\x1b[0m';
+      else if (item.status === 'ACTIVE_ONLY') statusLabel = '\x1b[36m[ACTIVE ONLY]\x1b[0m';
+      else if (item.status === 'REPO_ONLY') statusLabel = '\x1b[31m[REPO ONLY]\x1b[0m';
+      else if (item.status === 'MODIFIED') statusLabel = '\x1b[33m[MODIFIED]\x1b[0m';
+
+      console.log(`  • ${item.relActive.padEnd(28)} -> ${item.relRepo.padEnd(30)} ${statusLabel}`);
+    }
+
+    if (!diffReport.inSync) {
+      console.log('\n\x1b[90mTip: Run `hud backup` to copy active changes -> repo, or `hud deploy` to copy repo -> active.\x1b[0m');
+    }
+
+    process.exit(diffReport.inSync ? 0 : 1);
+  }
+
+  if (cmd === 'backup' || cmd === 'backup-repo' || cmd === 'push-repo' || cmd === 'sync-repo') {
+    const isJson = args.includes('--json') || args.includes('-j');
+    const force = args.includes('--force') || args.includes('-f');
+    const report = performBackup({ force });
+
+    if (isJson) {
+      console.log(JSON.stringify(report, null, 2));
+      process.exit(report.success ? 0 : 1);
+    }
+
+    console.log('\x1b[1m\x1b[36m=== Antigravity HUD: Active -> Repo Backup ===\x1b[0m\n');
+    console.log(`Target Repo: \x1b[33m${report.repoRoot}\x1b[0m`);
+    console.log(`Active Dir:  \x1b[33m${report.scriptsDir}\x1b[0m\n`);
+
+    if (report.backedUp.length > 0) {
+      console.log(`\x1b[32m✔ Backed up ${report.backedUp.length} file(s) to repository:\x1b[0m`);
+      report.backedUp.forEach(b => console.log(`  • ${b.file}`));
+    } else if (report.conflicts.length === 0 && report.errors.length === 0) {
+      console.log('\x1b[32m✔ Repository is already up to date with active runtime.\x1b[0m');
+    }
+
+    if (report.conflicts.length > 0) {
+      console.log('\n\x1b[31m⚠️ Conflicts Detected (Repo has newer edits):\x1b[0m');
+      report.conflicts.forEach(c => console.log(`  ✖ ${c.file}: ${c.details}`));
+      console.log('\x1b[90mUse `hud backup --force` to overwrite repository files.\x1b[0m');
+    }
+
+    if (report.errors.length > 0) {
+      console.log('\n\x1b[31mErrors encountered:\x1b[0m');
+      report.errors.forEach(e => console.log(`  ✖ ${e.file}: ${e.error}`));
+    }
+
+    process.exit(report.success ? 0 : 1);
+  }
+
+  if (cmd === 'deploy' || cmd === 'deploy-active' || cmd === 'pull-repo' || cmd === 'sync-active') {
+    const isJson = args.includes('--json') || args.includes('-j');
+    const force = args.includes('--force') || args.includes('-f');
+    const report = performDeploy({ force });
+
+    if (isJson) {
+      console.log(JSON.stringify(report, null, 2));
+      process.exit(report.success ? 0 : 1);
+    }
+
+    console.log('\x1b[1m\x1b[36m=== Antigravity HUD: Repo -> Active Runtime Deploy ===\x1b[0m\n');
+    console.log(`Source Repo: \x1b[33m${report.repoRoot}\x1b[0m\n`);
+
+    if (report.deployed.length > 0) {
+      console.log(`\x1b[32m✔ Deployed ${report.deployed.length} component(s) to active directories:\x1b[0m`);
+      report.deployed.forEach(d => console.log(`  • ${d.dest}`));
+    } else if (report.conflicts.length === 0 && report.errors.length === 0) {
+      console.log('\x1b[32m✔ Active runtime directories are already in sync with repository.\x1b[0m');
+    }
+
+    if (report.conflicts.length > 0) {
+      console.log('\n\x1b[31m⚠️ Conflicts Detected (Active runtime has newer edits):\x1b[0m');
+      report.conflicts.forEach(c => console.log(`  ✖ ${c.file}: ${c.details}`));
+      console.log('\x1b[90mUse `hud deploy --force` to overwrite active runtime files.\x1b[0m');
+    }
+
+    process.exit(report.success ? 0 : 1);
+  }
 
   if (cmd === 'check' || cmd === 'health' || cmd === 'doctor' || cmd === 'status-check') {
     const isJson = args.includes('--json') || args.includes('-j');
@@ -617,6 +1087,56 @@ if (args.length > 0) {
 
     console.log('\n\x1b[90mTip: Run `hud help` for usage examples or `hud edit` / `hud gui` to customize.\x1b[0m');
     process.exit(0);
+  }
+
+  if (cmd === 'preset' || cmd === 'presets' || cmd === 'layout') {
+    const sub = args[1]?.toLowerCase();
+    if (!sub || sub === 'list' || sub === 'ls') {
+      console.log('\x1b[1m\x1b[36m=== Antigravity HUD: Available Layout Presets ===\x1b[0m\n');
+      const presets = listAvailablePresets();
+      if (presets.length === 0) {
+        console.log('  \x1b[90mNo presets found in presets/ directory.\x1b[0m');
+      } else {
+        for (const p of presets) {
+          const isCurrent = cfg.lines === p.lines && JSON.stringify(cfg.line1) === JSON.stringify(p.line1);
+          const activeTag = isCurrent ? ' \x1b[32m[ACTIVE]\x1b[0m' : '';
+          console.log(`  • \x1b[1m\x1b[33m${p.id.padEnd(24)}\x1b[0m (${p.lines} line${p.lines > 1 ? 's' : ''}): ${p.name || p.id}${activeTag}`);
+          if (p.description) {
+            console.log(`    \x1b[90m${p.description}\x1b[0m`);
+          }
+        }
+      }
+      console.log('\n\x1b[90mUsage:\x1b[0m');
+      console.log('  hud preset load <name>    Apply a layout preset (e.g. hud preset load 4line_command_center)');
+      console.log('  hud preset save <name>    Save current active layout as a named preset');
+      process.exit(0);
+    }
+
+    if (sub === 'save') {
+      const pName = args[2];
+      if (!pName) {
+        console.error('Usage: hud preset save <name>');
+        process.exit(1);
+      }
+      const savedId = saveCustomPreset(pName, cfg);
+      console.log(`\x1b[32m✔ Current layout successfully saved as preset: "${savedId}"\x1b[0m`);
+      process.exit(0);
+    }
+
+    if (sub === 'load' || sub === 'apply' || sub === 'use' || sub === 'set') {
+      const pName = args[2];
+      if (!pName) {
+        console.error('Usage: hud preset load <name>');
+        process.exit(1);
+      }
+      const loaded = loadCustomPreset(pName);
+      if (!loaded) {
+        console.error(`Preset "${pName}" not found. Run 'hud preset list' to see available options.`);
+        process.exit(1);
+      }
+      console.log(`\x1b[32m✔ Applied layout preset "${pName}" (${loaded.lines || 2} line(s)).\x1b[0m`);
+      process.exit(0);
+    }
   }
 
   if (cmd === 'lines' || cmd === 'line-count') {
@@ -1147,6 +1667,8 @@ process.stdin.on('data', (chunk) => {
   input += chunk;
 });
 
+const _gitCache = new Map();
+
 function getGitDetails(startDir) {
   let branch = null;
   let dirty = false;
@@ -1157,7 +1679,13 @@ function getGitDetails(startDir) {
   let untracked = 0;
 
   try {
-    let curr = path.resolve(startDir);
+    const resolvedDir = path.resolve(startDir);
+    const cached = _gitCache.get(resolvedDir);
+    if (cached && (Date.now() - cached.timestamp < 750)) {
+      return cached.data;
+    }
+
+    let curr = resolvedDir;
     let gitDir = null;
 
     while (curr) {
@@ -1189,10 +1717,12 @@ function getGitDetails(startDir) {
       }
 
       try {
-        const porcelain = execFileSync('cmd.exe', ['/c', 'git status --porcelain=v1 -unormal 2>nul'], {
+        const porcelain = execFileSync('git', ['status', '--porcelain=v1', '-unormal'], {
           cwd: startDir,
           windowsHide: true,
-          encoding: 'utf8'
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'ignore'],
+          timeout: 1500
         });
         if (porcelain && porcelain.trim()) {
           dirty = true;
@@ -1211,10 +1741,12 @@ function getGitDetails(startDir) {
 
       try {
         if (branch) {
-          const ab = execFileSync('cmd.exe', ['/c', `git rev-list --left-right --count HEAD...@{upstream} 2>nul`], {
+          const ab = execFileSync('git', ['rev-list', '--left-right', '--count', 'HEAD...@{upstream}'], {
             cwd: startDir,
             windowsHide: true,
-            encoding: 'utf8'
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+            timeout: 1500
           }).trim();
           if (ab) {
             const [a, b] = ab.split(/\s+/).map(n => parseInt(n, 10));
@@ -1224,6 +1756,10 @@ function getGitDetails(startDir) {
         }
       } catch (_) {}
     }
+
+    const result = { branch, dirty, ahead, behind, staged, unstaged, untracked };
+    _gitCache.set(resolvedDir, { timestamp: Date.now(), data: result });
+    return result;
   } catch (_) {}
 
   return { branch, dirty, ahead, behind, staged, unstaged, untracked };
@@ -1307,6 +1843,8 @@ function clearForkSnooze() {
   } catch (_) {}
 }
 
+const _stepCountCache = new Map();
+
 function getTranscriptStepCount(payload) {
   if (!payload || typeof payload !== 'object') return 0;
   if (typeof payload.step_count === 'number' && payload.step_count > 0) {
@@ -1328,8 +1866,18 @@ function getTranscriptStepCount(payload) {
   for (const c of candidates) {
     if (c && fs.existsSync(c)) {
       try {
+        const stat = fs.statSync(c);
+        const cached = _stepCountCache.get(c);
+        if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
+          return cached.count;
+        }
         const raw = fs.readFileSync(c, 'utf8');
-        const count = raw.split(/\r?\n/).filter(Boolean).length;
+        let count = 0;
+        for (let i = 0; i < raw.length; i++) {
+          if (raw.charCodeAt(i) === 10) count++;
+        }
+        if (raw.length > 0 && raw.charCodeAt(raw.length - 1) !== 10) count++;
+        _stepCountCache.set(c, { mtimeMs: stat.mtimeMs, size: stat.size, count });
         if (count > 0) return count;
       } catch (_) {}
     }
@@ -1611,13 +2159,29 @@ function getQuotaSegments(payload, style5h = 'full', styleWk = 'full') {
     try {
       const qDir = path.dirname(quotaCacheFile);
       if (!fs.existsSync(qDir)) fs.mkdirSync(qDir, { recursive: true });
-      fs.writeFileSync(quotaCacheFile, JSON.stringify({
-        q5hPercent: q5hPercent !== null ? Math.round(q5hPercent) : null,
-        q5hReset,
-        qWkPercent: qWkPercent !== null ? Math.round(qWkPercent) : null,
-        qWkReset,
-        updatedAt: Date.now()
-      }), 'utf8');
+      const now = Date.now();
+      const rounded5h = q5hPercent !== null ? Math.round(q5hPercent) : null;
+      const roundedWk = qWkPercent !== null ? Math.round(qWkPercent) : null;
+
+      let shouldWrite = true;
+      if (fs.existsSync(quotaCacheFile)) {
+        try {
+          const prev = JSON.parse(fs.readFileSync(quotaCacheFile, 'utf8'));
+          if (prev.q5hPercent === rounded5h && prev.qWkPercent === roundedWk && (now - prev.updatedAt < 30000)) {
+            shouldWrite = false;
+          }
+        } catch (_) {}
+      }
+
+      if (shouldWrite) {
+        fs.writeFileSync(quotaCacheFile, JSON.stringify({
+          q5hPercent: rounded5h,
+          q5hReset,
+          qWkPercent: roundedWk,
+          qWkReset,
+          updatedAt: now
+        }), 'utf8');
+      }
     } catch (_) {}
   } else if (!isTestMode && fs.existsSync(quotaCacheFile)) {
     try {
@@ -1697,12 +2261,15 @@ function getSessionUptime(payload) {
       if (fs.existsSync(stampFile)) {
         const data = JSON.parse(fs.readFileSync(stampFile, 'utf8'));
         if (data.startTime && (Date.now() - data.lastSeen < 24 * 3600 * 1000)) {
-          data.lastSeen = Date.now();
-          fs.writeFileSync(stampFile, JSON.stringify(data), 'utf8');
+          if (Date.now() - (data.lastWritten || 0) > 5000) {
+            data.lastSeen = Date.now();
+            data.lastWritten = Date.now();
+            fs.writeFileSync(stampFile, JSON.stringify(data), 'utf8');
+          }
           return Math.max(0, Math.floor((Date.now() - data.startTime) / 1000));
         }
       }
-      const newRecord = { startTime: Date.now(), lastSeen: Date.now() };
+      const newRecord = { startTime: Date.now(), lastSeen: Date.now(), lastWritten: Date.now() };
       fs.writeFileSync(stampFile, JSON.stringify(newRecord), 'utf8');
     } catch (_) {}
   }
@@ -1724,12 +2291,26 @@ process.stdin.on('end', () => {
     const cfg = loadConfig();
     const sep = `\x1b[90m${cfg.separator}\x1b[0m`;
 
+    const numLines = Math.max(1, Math.min(4, cfg.lines || 2));
+    const linesList = [cfg.line1, cfg.line2, cfg.line3, cfg.line4].slice(0, numLines);
+    const disabledSet = new Set(cfg.disabled || []);
+
+    const activeItemSet = new Set();
+    for (const line of linesList) {
+      if (Array.isArray(line)) {
+        for (const k of line) {
+          if (!disabledSet.has(k)) activeItemSet.add(k);
+        }
+      }
+    }
+
     // 1. Workspace, Project & Git
     const stWs = resolveItemStyle('workspace', cfg, width);
     const cwd = payload.workspace?.current_dir || payload.cwd || process.cwd();
     const wsName = path.basename(cwd) || cwd;
     const projName = getProjectName(cwd, payload);
-    const git = getGitDetails(cwd);
+    const needGit = activeItemSet.has('workspace') || activeItemSet.has('git_status') || activeItemSet.has('fork') || activeItemSet.has('fork_advisory');
+    const git = needGit ? getGitDetails(cwd) : {};
 
     let gitInfo = '';
     if (git.branch) {
@@ -1754,43 +2335,48 @@ process.stdin.on('end', () => {
     const wsSegment = `\x1b[1m\x1b[34m📁 ${displayTarget}\x1b[0m${gitInfo}`;
 
     // 2. Model & Effort
-    const stMdl = resolveItemStyle('model', cfg, width);
-    let modelName = 'Gemini';
-    if (typeof payload.model === 'string') {
-      modelName = payload.model;
-    } else if (payload.model && typeof payload.model === 'object') {
-      modelName = payload.model.display_name || payload.model.id || 'Gemini';
+    let modelSegment = '';
+    if (activeItemSet.has('model')) {
+      const stMdl = resolveItemStyle('model', cfg, width);
+      let modelName = 'Gemini';
+      if (typeof payload.model === 'string') {
+        modelName = payload.model;
+      } else if (payload.model && typeof payload.model === 'object') {
+        modelName = payload.model.display_name || payload.model.id || 'Gemini';
+      }
+      if (stMdl === 'minimal') {
+        if (modelName.toLowerCase().includes('flash')) modelName = 'Flash';
+        else if (modelName.toLowerCase().includes('sonnet')) modelName = 'Sonnet';
+        else if (modelName.toLowerCase().includes('opus')) modelName = 'Opus';
+        else if (modelName.toLowerCase().includes('pro')) modelName = 'Pro';
+        else modelName = modelName.split(' ')[0];
+      } else if (stMdl === 'short') {
+        modelName = modelName.replace(/\(.*?\)/g, '').trim();
+      }
+      const effort = (stMdl === 'full' && payload.model?.effort) ? ` \x1b[90m[🧠 ${payload.model.effort.toUpperCase()}]\x1b[0m` : '';
+      modelSegment = `\x1b[1m\x1b[36m${modelName}\x1b[0m${effort}`;
     }
-    if (stMdl === 'minimal') {
-      if (modelName.toLowerCase().includes('flash')) modelName = 'Flash';
-      else if (modelName.toLowerCase().includes('sonnet')) modelName = 'Sonnet';
-      else if (modelName.toLowerCase().includes('opus')) modelName = 'Opus';
-      else if (modelName.toLowerCase().includes('pro')) modelName = 'Pro';
-      else modelName = modelName.split(' ')[0];
-    } else if (stMdl === 'short') {
-      modelName = modelName.replace(/\(.*?\)/g, '').trim();
-    }
-    const effort = (stMdl === 'full' && payload.model?.effort) ? ` \x1b[90m[🧠 ${payload.model.effort.toUpperCase()}]\x1b[0m` : '';
-    const modelSegment = `\x1b[1m\x1b[36m${modelName}\x1b[0m${effort}`;
 
     // 3. Agent State
-    const stState = resolveItemStyle('state', cfg, width);
-    const rawState = (payload.agent_state || payload.state || 'idle').toUpperCase();
-    let stateColor = '\x1b[36m';
-    if (rawState.includes('WORK')) stateColor = '\x1b[32m';
-    else if (rawState.includes('WAIT')) stateColor = '\x1b[33m';
-    else if (rawState.includes('ERR')) stateColor = '\x1b[31m';
+    let stateSegment = '';
+    if (activeItemSet.has('state')) {
+      const stState = resolveItemStyle('state', cfg, width);
+      const rawState = (payload.agent_state || payload.state || 'idle').toUpperCase();
+      let stateColor = '\x1b[36m';
+      if (rawState.includes('WORK')) stateColor = '\x1b[32m';
+      else if (rawState.includes('WAIT')) stateColor = '\x1b[33m';
+      else if (rawState.includes('ERR')) stateColor = '\x1b[31m';
 
-    let stateSegment = `${stateColor}\x1b[1m[${rawState}]\x1b[0m`;
-    if (stState === 'minimal') {
-      stateSegment = `${stateColor}●\x1b[0m`;
-    } else if (stState === 'short') {
-      const shortCode = rawState.includes('WORK') ? 'WRK' : (rawState.includes('WAIT') ? 'WAIT' : (rawState.includes('IDLE') ? 'IDL' : rawState.slice(0, 4)));
-      stateSegment = `${stateColor}[${shortCode}]\x1b[0m`;
+      stateSegment = `${stateColor}\x1b[1m[${rawState}]\x1b[0m`;
+      if (stState === 'minimal') {
+        stateSegment = `${stateColor}●\x1b[0m`;
+      } else if (stState === 'short') {
+        const shortCode = rawState.includes('WORK') ? 'WRK' : (rawState.includes('WAIT') ? 'WAIT' : (rawState.includes('IDLE') ? 'IDL' : rawState.slice(0, 4)));
+        stateSegment = `${stateColor}[${shortCode}]\x1b[0m`;
+      }
     }
 
     // 4. Context Window & Cache Efficiency
-    const stCtx = resolveItemStyle('context', cfg, width);
     const ctx = payload.context_window || {};
     const totalTokens = ctx.total_input_tokens ?? payload.total_input_tokens ?? 0;
     let ctxPercent = ctx.used_percentage ?? payload.context_percentage ?? 0;
@@ -1800,166 +2386,204 @@ process.stdin.on('end', () => {
       ctxPercent = Math.round(ctxPercent);
     }
 
-    const currentUsage = ctx.current_usage || payload.current_usage || {};
-    const cacheRead = currentUsage.cache_read_input_tokens ?? payload.cache_read_input_tokens ?? 0;
-    let cachePercent = 0;
-    if (totalTokens > 0 && cacheRead > 0) {
-      cachePercent = Math.round((cacheRead / totalTokens) * 100);
-    }
+    let ctxSegment = '';
+    if (activeItemSet.has('context')) {
+      const stCtx = resolveItemStyle('context', cfg, width);
+      const currentUsage = ctx.current_usage || payload.current_usage || {};
+      const cacheRead = currentUsage.cache_read_input_tokens ?? payload.cache_read_input_tokens ?? 0;
+      let cachePercent = 0;
+      if (totalTokens > 0 && cacheRead > 0) {
+        cachePercent = Math.round((cacheRead / totalTokens) * 100);
+      }
 
-    const progressBar = renderProgressBar(ctxPercent, stCtx === 'minimal' ? 4 : (stCtx === 'short' ? 6 : 10));
-    let tokenDisplay = '';
-    if (totalTokens > 0) {
-      tokenDisplay = totalTokens >= 1000 ? `${Math.round(totalTokens / 1000)}k` : `${totalTokens}`;
-      if (stCtx === 'full') tokenDisplay = `${totalTokens.toLocaleString()} tok`;
-    }
-    const cacheDisplay = cachePercent > 0 ? `\x1b[32m(⚡ ${cachePercent}%)\x1b[0m` : '';
+      const progressBar = renderProgressBar(ctxPercent, stCtx === 'minimal' ? 4 : (stCtx === 'short' ? 6 : 10));
+      let tokenDisplay = '';
+      if (totalTokens > 0) {
+        tokenDisplay = totalTokens >= 1000 ? `${Math.round(totalTokens / 1000)}k` : `${totalTokens}`;
+        if (stCtx === 'full') tokenDisplay = `${totalTokens.toLocaleString()} tok`;
+      }
+      const cacheDisplay = cachePercent > 0 ? `\x1b[32m(⚡ ${cachePercent}%)\x1b[0m` : '';
 
-    let ctxSegment = `Ctx: ${progressBar} \x1b[1m${ctxPercent}%\x1b[0m`;
-    if (stCtx === 'minimal') {
-      ctxSegment = `Ctx: \x1b[1m${ctxPercent}%\x1b[0m`;
-    } else if (stCtx === 'short') {
-      if (tokenDisplay) ctxSegment += ` (${tokenDisplay})`;
-      if (cacheDisplay) ctxSegment += ` ${cacheDisplay}`;
-    } else {
-      if (tokenDisplay) ctxSegment += ` (${tokenDisplay})`;
-      if (cacheDisplay) ctxSegment += ` ${cacheDisplay}`;
+      ctxSegment = `Ctx: ${progressBar} \x1b[1m${ctxPercent}%\x1b[0m`;
+      if (stCtx === 'minimal') {
+        ctxSegment = `Ctx: \x1b[1m${ctxPercent}%\x1b[0m`;
+      } else if (stCtx === 'short') {
+        if (tokenDisplay) ctxSegment += ` (${tokenDisplay})`;
+        if (cacheDisplay) ctxSegment += ` ${cacheDisplay}`;
+      } else {
+        if (tokenDisplay) ctxSegment += ` (${tokenDisplay})`;
+        if (cacheDisplay) ctxSegment += ` ${cacheDisplay}`;
+      }
     }
 
     // 5. Dual Quotas (5-Hour Rolling & Weekly)
-    const stQ5h = resolveItemStyle('quota_5h', cfg, width);
-    const stQwk = resolveItemStyle('quota_weekly', cfg, width);
-    const { quota5hSegment, quotaWkSegment } = getQuotaSegments(payload, stQ5h, stQwk);
+    let quota5hSegment = '';
+    let quotaWkSegment = '';
+    if (activeItemSet.has('quota_5h') || activeItemSet.has('quota_weekly') || activeItemSet.has('quota')) {
+      const stQ5h = resolveItemStyle('quota_5h', cfg, width);
+      const stQwk = resolveItemStyle('quota_weekly', cfg, width);
+      const qRes = getQuotaSegments(payload, stQ5h, stQwk);
+      quota5hSegment = qRes.quota5hSegment;
+      quotaWkSegment = qRes.quotaWkSegment;
+    }
 
     // 6. MCP Servers
-    const stMcp = resolveItemStyle('mcp', cfg, width);
-    let mcpCount = 0;
-    if (Array.isArray(payload.mcp_servers)) mcpCount = payload.mcp_servers.length;
-    else if (typeof payload.mcp_server_count === 'number') mcpCount = payload.mcp_server_count;
-    else if (typeof payload.mcp_servers_count === 'number') mcpCount = payload.mcp_servers_count;
-    else if (typeof payload.mcp_count === 'number') mcpCount = payload.mcp_count;
+    let mcpSegment = '';
+    if (activeItemSet.has('mcp')) {
+      const stMcp = resolveItemStyle('mcp', cfg, width);
+      let mcpCount = 0;
+      if (Array.isArray(payload.mcp_servers)) mcpCount = payload.mcp_servers.length;
+      else if (typeof payload.mcp_server_count === 'number') mcpCount = payload.mcp_server_count;
+      else if (typeof payload.mcp_servers_count === 'number') mcpCount = payload.mcp_servers_count;
+      else if (typeof payload.mcp_count === 'number') mcpCount = payload.mcp_count;
 
-    if (mcpCount === 0) {
-      const mcpCfgPath = path.join(homeDir, '.gemini', 'config', 'mcp_config.json');
-      if (fs.existsSync(mcpCfgPath)) {
-        try {
-          const cfg = JSON.parse(fs.readFileSync(mcpCfgPath, 'utf8'));
-          if (cfg.mcpServers) mcpCount = Object.keys(cfg.mcpServers).length;
-        } catch (_) {}
+      if (mcpCount === 0) {
+        const mcpCfgPath = path.join(homeDir, '.gemini', 'config', 'mcp_config.json');
+        if (fs.existsSync(mcpCfgPath)) {
+          try {
+            const cfg2 = JSON.parse(fs.readFileSync(mcpCfgPath, 'utf8'));
+            if (cfg2.mcpServers) mcpCount = Object.keys(cfg2.mcpServers).length;
+          } catch (_) {}
+        }
       }
+      const mcpLabel = stMcp === 'full' ? ` ${mcpCount} MCP` : ` ${mcpCount}`;
+      mcpSegment = mcpCount > 0 ? `\x1b[36m🔌${mcpLabel}\x1b[0m` : '';
     }
-    const mcpLabel = stMcp === 'full' ? ` ${mcpCount} MCP` : ` ${mcpCount}`;
-    const mcpSegment = mcpCount > 0 ? `\x1b[36m🔌${mcpLabel}\x1b[0m` : '';
 
     // 7. Background Tasks & Subagents
-    const stTasks = resolveItemStyle('tasks', cfg, width);
-    let taskCount = 0;
-    if (typeof payload.running_tasks_count === 'number') taskCount = payload.running_tasks_count;
-    else if (typeof payload.background_task_count === 'number') taskCount = payload.background_task_count;
-    else if (Array.isArray(payload.background_tasks)) {
-      taskCount = payload.background_tasks.filter(t => {
-        if (!t) return false;
-        if (typeof t === 'string') return true;
-        const st = (t.state || t.status || '').toLowerCase();
-        return st === 'running' || st === 'active' || st === 'in_progress' || st === 'waiting_for_input';
-      }).length;
-    } else if (Array.isArray(payload.tasks)) {
-      taskCount = payload.tasks.filter(t => {
-        if (!t) return false;
-        if (typeof t === 'string') return true;
-        const st = (t.state || t.status || '').toLowerCase();
-        return st === 'running' || st === 'active' || st === 'in_progress' || st === 'waiting_for_input';
-      }).length;
-    } else if (payload.tasks && typeof payload.tasks.running === 'number') {
-      taskCount = payload.tasks.running;
+    let taskSegment = '';
+    if (activeItemSet.has('tasks')) {
+      const stTasks = resolveItemStyle('tasks', cfg, width);
+      let taskCount = 0;
+      if (typeof payload.running_tasks_count === 'number') taskCount = payload.running_tasks_count;
+      else if (typeof payload.background_task_count === 'number') taskCount = payload.background_task_count;
+      else if (Array.isArray(payload.background_tasks)) {
+        taskCount = payload.background_tasks.filter(t => {
+          if (!t) return false;
+          if (typeof t === 'string') return true;
+          const st = (t.state || t.status || '').toLowerCase();
+          return st === 'running' || st === 'active' || st === 'in_progress' || st === 'waiting_for_input';
+        }).length;
+      } else if (Array.isArray(payload.tasks)) {
+        taskCount = payload.tasks.filter(t => {
+          if (!t) return false;
+          if (typeof t === 'string') return true;
+          const st = (t.state || t.status || '').toLowerCase();
+          return st === 'running' || st === 'active' || st === 'in_progress' || st === 'waiting_for_input';
+        }).length;
+      } else if (payload.tasks && typeof payload.tasks.running === 'number') {
+        taskCount = payload.tasks.running;
+      }
+      const taskLabel = stTasks === 'full' ? ` ${taskCount} task${taskCount > 1 ? 's' : ''}` : ` ${taskCount}`;
+      taskSegment = taskCount > 0 ? `\x1b[33m⚙️${taskLabel}\x1b[0m` : '';
     }
-    const taskLabel = stTasks === 'full' ? ` ${taskCount} task${taskCount > 1 ? 's' : ''}` : ` ${taskCount}`;
-    const taskSegment = taskCount > 0 ? `\x1b[33m⚙️${taskLabel}\x1b[0m` : '';
 
-    const stSub = resolveItemStyle('subagents', cfg, width);
-    let subagentCount = 0;
-    if (typeof payload.running_subagents_count === 'number') subagentCount = payload.running_subagents_count;
-    else if (typeof payload.active_subagents_count === 'number') subagentCount = payload.active_subagents_count;
-    else if (Array.isArray(payload.subagents)) {
-      subagentCount = payload.subagents.filter(s => {
-        if (!s) return false;
-        if (typeof s === 'string') return true;
-        const st = (s.state || s.status || '').toLowerCase();
-        return st === 'running' || st === 'waiting_for_input' || st === 'waiting_for_dependents' || st === 'in_progress';
-      }).length;
-    } else if (payload.subagents && typeof payload.subagents.active === 'number') {
-      subagentCount = payload.subagents.active;
-    } else if (typeof payload.subagent_count === 'number') {
-      subagentCount = payload.subagent_count;
+    let subagentSegment = '';
+    if (activeItemSet.has('subagents')) {
+      const stSub = resolveItemStyle('subagents', cfg, width);
+      let subagentCount = 0;
+      if (typeof payload.running_subagents_count === 'number') subagentCount = payload.running_subagents_count;
+      else if (typeof payload.active_subagents_count === 'number') subagentCount = payload.active_subagents_count;
+      else if (Array.isArray(payload.subagents)) {
+        subagentCount = payload.subagents.filter(s => {
+          if (!s) return false;
+          if (typeof s === 'string') return true;
+          const st = (s.state || s.status || '').toLowerCase();
+          return st === 'running' || st === 'waiting_for_input' || st === 'waiting_for_dependents' || st === 'in_progress';
+        }).length;
+      } else if (payload.subagents && typeof payload.subagents.active === 'number') {
+        subagentCount = payload.subagents.active;
+      } else if (typeof payload.subagent_count === 'number') {
+        subagentCount = payload.subagent_count;
+      }
+      const subLabel = stSub === 'full' ? ` ${subagentCount} subagent${subagentCount > 1 ? 's' : ''}` : ` ${subagentCount}`;
+      subagentSegment = subagentCount > 0 ? `\x1b[36m🤖${subLabel}\x1b[0m` : '';
     }
-    const subLabel = stSub === 'full' ? ` ${subagentCount} subagent${subagentCount > 1 ? 's' : ''}` : ` ${subagentCount}`;
-    const subagentSegment = subagentCount > 0 ? `\x1b[36m🤖${subLabel}\x1b[0m` : '';
 
     // 8. Artifacts & Queued Messages
-    const artCount = payload.artifact_count ?? (Array.isArray(payload.artifacts) ? payload.artifacts.length : 0);
-    const artifacts = artCount > 0 ? `\x1b[33m📝 ${artCount}\x1b[0m` : '';
+    let artifacts = '';
+    if (activeItemSet.has('artifacts')) {
+      const artCount = payload.artifact_count ?? (Array.isArray(payload.artifacts) ? payload.artifacts.length : 0);
+      artifacts = artCount > 0 ? `\x1b[33m📝 ${artCount}\x1b[0m` : '';
+    }
 
-    let queueCount = 0;
-    if (typeof payload.pending_input_count === 'number') queueCount = payload.pending_input_count;
-    else if (typeof payload.queued_messages_count === 'number') queueCount = payload.queued_messages_count;
-    else if (typeof payload.queued_inputs_count === 'number') queueCount = payload.queued_inputs_count;
-    else if (typeof payload.queue_count === 'number') queueCount = payload.queue_count;
-    else if (typeof payload.queue_length === 'number') queueCount = payload.queue_length;
-    else if (Array.isArray(payload.queued_messages)) queueCount = payload.queued_messages.length;
-    else if (Array.isArray(payload.queued_inputs)) queueCount = payload.queued_inputs.length;
-    else if (Array.isArray(payload.pending_inputs)) queueCount = payload.pending_inputs.length;
-    else if (Array.isArray(payload.pending_messages)) queueCount = payload.pending_messages.length;
-    else if (Array.isArray(payload.message_queue)) queueCount = payload.message_queue.length;
+    let queued = '';
+    if (activeItemSet.has('queue')) {
+      let queueCount = 0;
+      if (typeof payload.pending_input_count === 'number') queueCount = payload.pending_input_count;
+      else if (typeof payload.queued_messages_count === 'number') queueCount = payload.queued_messages_count;
+      else if (typeof payload.queued_inputs_count === 'number') queueCount = payload.queued_inputs_count;
+      else if (typeof payload.queue_count === 'number') queueCount = payload.queue_count;
+      else if (typeof payload.queue_length === 'number') queueCount = payload.queue_length;
+      else if (Array.isArray(payload.queued_messages)) queueCount = payload.queued_messages.length;
+      else if (Array.isArray(payload.queued_inputs)) queueCount = payload.queued_inputs.length;
+      else if (Array.isArray(payload.pending_inputs)) queueCount = payload.pending_inputs.length;
+      else if (Array.isArray(payload.pending_messages)) queueCount = payload.pending_messages.length;
+      else if (Array.isArray(payload.message_queue)) queueCount = payload.message_queue.length;
 
-    const queued = queueCount > 0 ? `\x1b[36m⏳ ${queueCount}\x1b[0m` : '';
+      queued = queueCount > 0 ? `\x1b[36m⏳ ${queueCount}\x1b[0m` : '';
+    }
 
     // 9. Session Runtime
-    const stSess = resolveItemStyle('session', cfg, width);
-    const sessionSec = getSessionUptime(payload);
     let sessionSegment = '';
-    if (sessionSec > 0) {
-      const uptimeCfg = cfg.session_uptime || DEFAULT_CONFIG.session_uptime;
-      const showSec = uptimeCfg.show_seconds !== false;
-      const col = getUptimeColor(sessionSec, uptimeCfg.thresholds);
-      sessionSegment = `${col}⏱️ ${formatDuration(sessionSec, showSec, stSess)}\x1b[0m`;
+    if (activeItemSet.has('session')) {
+      const stSess = resolveItemStyle('session', cfg, width);
+      const sessionSec = getSessionUptime(payload);
+      if (sessionSec > 0) {
+        const uptimeCfg = cfg.session_uptime || DEFAULT_CONFIG.session_uptime;
+        const showSec = uptimeCfg.show_seconds !== false;
+        const col = getUptimeColor(sessionSec, uptimeCfg.thresholds);
+        sessionSegment = `${col}⏱️ ${formatDuration(sessionSec, showSec, stSess)}\x1b[0m`;
+      }
     }
 
     // 10. Auth & Sandbox Badges
-    const stAuth = resolveItemStyle('auth', cfg, width);
-    const authBadge = getAuthBadge(payload, stAuth);
-    const authSegment = authBadge ? `\x1b[90m${authBadge}\x1b[0m` : '';
+    let authSegment = '';
+    if (activeItemSet.has('auth')) {
+      const stAuth = resolveItemStyle('auth', cfg, width);
+      const authBadge = getAuthBadge(payload, stAuth);
+      authSegment = authBadge ? `\x1b[90m${authBadge}\x1b[0m` : '';
+    }
 
-    const stSand = resolveItemStyle('sandbox', cfg, width);
-    let sandboxLabel = '🛡️ Sandbox';
-    if (stSand === 'minimal') sandboxLabel = '🛡️';
-    else if (stSand === 'short') sandboxLabel = '🛡️ Sandboxed';
-    const sandboxSegment = (payload.sandbox?.enabled || payload.sandbox_enabled) ? `\x1b[32m${sandboxLabel}\x1b[0m` : '';
+    let sandboxSegment = '';
+    if (activeItemSet.has('sandbox')) {
+      const stSand = resolveItemStyle('sandbox', cfg, width);
+      let sandboxLabel = '🛡️ Sandbox';
+      if (stSand === 'minimal') sandboxLabel = '🛡️';
+      else if (stSand === 'short') sandboxLabel = '🛡️ Sandboxed';
+      sandboxSegment = (payload.sandbox?.enabled || payload.sandbox_enabled) ? `\x1b[32m${sandboxLabel}\x1b[0m` : '';
+    }
 
     // 11. Git Working Directory Clean / Dirty Status
-    const stGit = resolveItemStyle('git_status', cfg, width);
     let gitStatusSegment = '';
-    if (git.branch) {
-      if (!git.dirty) {
-        gitStatusSegment = stGit === 'minimal' ? '\x1b[32m🌿\x1b[0m' : '\x1b[32m🌿 Clean\x1b[0m';
-      } else {
-        let details = [];
-        if (git.staged > 0) details.push(`+${git.staged}`);
-        if (git.unstaged > 0) details.push(`~${git.unstaged}`);
-        if (git.untracked > 0) details.push(`?${git.untracked}`);
-        const detailStr = details.length > 0 ? ` \x1b[90m(${details.join(' ')})\x1b[0m` : '';
-        if (stGit === 'minimal') {
-          gitStatusSegment = '\x1b[33m⚠️\x1b[0m';
-        } else if (stGit === 'short') {
-          gitStatusSegment = `\x1b[33m⚠️\x1b[0m${detailStr}`;
+    if (activeItemSet.has('git_status')) {
+      const stGit = resolveItemStyle('git_status', cfg, width);
+      if (git.branch) {
+        if (!git.dirty) {
+          gitStatusSegment = stGit === 'minimal' ? '\x1b[32m🌿\x1b[0m' : '\x1b[32m🌿 Clean\x1b[0m';
         } else {
-          gitStatusSegment = `\x1b[33m⚠️ Dirty\x1b[0m${detailStr}`;
+          let details = [];
+          if (git.staged > 0) details.push(`+${git.staged}`);
+          if (git.unstaged > 0) details.push(`~${git.unstaged}`);
+          if (git.untracked > 0) details.push(`?${git.untracked}`);
+          const detailStr = details.length > 0 ? ` \x1b[90m(${details.join(' ')})\x1b[0m` : '';
+          if (stGit === 'minimal') {
+            gitStatusSegment = '\x1b[33m⚠️\x1b[0m';
+          } else if (stGit === 'short') {
+            gitStatusSegment = `\x1b[33m⚠️\x1b[0m${detailStr}`;
+          } else {
+            gitStatusSegment = `\x1b[33m⚠️ Dirty\x1b[0m${detailStr}`;
+          }
         }
       }
     }
 
     // 12. Fork Advisory Badge
-    const stFork = resolveItemStyle('fork', cfg, width);
-    const forkSegment = getForkAdvisory(payload, ctxPercent, cfg, git, stFork);
+    let forkSegment = '';
+    if (activeItemSet.has('fork') || activeItemSet.has('fork_advisory')) {
+      const stFork = resolveItemStyle('fork', cfg, width);
+      forkSegment = getForkAdvisory(payload, ctxPercent, cfg, git, stFork);
+    }
 
     // Item Map
     const itemMap = {
@@ -1983,8 +2607,6 @@ process.stdin.on('end', () => {
       queue: queued
     };
 
-    const disabledSet = new Set(cfg.disabled || []);
-
     function renderLine(keys) {
       return (keys || [])
         .filter(k => !disabledSet.has(k))
@@ -1993,8 +2615,6 @@ process.stdin.on('end', () => {
         .join(` ${sep} `);
     }
 
-    const numLines = Math.max(1, Math.min(4, cfg.lines || 2));
-    const linesList = [cfg.line1, cfg.line2, cfg.line3, cfg.line4].slice(0, numLines);
     const renderedLines = linesList.map(keys => renderLine(keys)).filter(Boolean);
     const output = renderedLines.join('\n');
 

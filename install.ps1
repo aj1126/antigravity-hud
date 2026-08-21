@@ -32,18 +32,41 @@ Write-Host "[1/3] Deploying HUD engine, WinForms configurator & Web GUI..." -For
 Copy-Item (Join-Path $RepoRoot "bin\hud.js") (Join-Path $ScriptsDir "hud.js") -Force
 Copy-Item (Join-Path $RepoRoot "bin\hud_gui.ps1") (Join-Path $ScriptsDir "hud_gui.ps1") -Force
 Copy-Item (Join-Path $RepoRoot "web\hud_gui.html") (Join-Path $ScriptsDir "hud_gui.html") -Force
-Write-Host "  [OK] Deployed runtime scripts to $ScriptsDir" -ForegroundColor Green
+Copy-Item (Join-Path $RepoRoot "Sync-AgyHud.ps1") (Join-Path $ScriptsDir "Sync-AgyHud.ps1") -Force
+
+$ScriptsConfigDest = Join-Path $ScriptsDir "hud_config.json"
+if (-not (Test-Path $ScriptsConfigDest)) {
+    Copy-Item (Join-Path $RepoRoot "bin\hud_config.json") $ScriptsConfigDest -Force
+}
+
+$ScriptsPresetsDir = Join-Path $ScriptsDir "presets"
+if (-not (Test-Path $ScriptsPresetsDir)) { New-Item -ItemType Directory -Path $ScriptsPresetsDir -Force | Out-Null }
+Copy-Item (Join-Path $RepoRoot "presets\*") $ScriptsPresetsDir -Recurse -Force
+
+$ScriptsHooksDir = Join-Path $ScriptsDir "hooks"
+if (-not (Test-Path $ScriptsHooksDir)) { New-Item -ItemType Directory -Path $ScriptsHooksDir -Force | Out-Null }
+Copy-Item (Join-Path $RepoRoot "hooks\*") $ScriptsHooksDir -Recurse -Force
+Write-Host "  [OK] Deployed runtime scripts, hooks, presets, and Sync-AgyHud to $ScriptsDir" -ForegroundColor Green
 
 # Copy to dedicated ~/.gemini/hud/
 Copy-Item (Join-Path $RepoRoot "bin\hud.js") (Join-Path $HudDir "hud.js") -Force
 Copy-Item (Join-Path $RepoRoot "bin\hud_gui.ps1") (Join-Path $HudDir "hud_gui.ps1") -Force
 Copy-Item (Join-Path $RepoRoot "web\hud_gui.html") (Join-Path $HudDir "hud_gui.html") -Force
+
+$HudPresetsDir = Join-Path $HudDir "presets"
+if (-not (Test-Path $HudPresetsDir)) { New-Item -ItemType Directory -Path $HudPresetsDir -Force | Out-Null }
+Copy-Item (Join-Path $RepoRoot "presets\*") $HudPresetsDir -Recurse -Force
+
+$HudHooksDir = Join-Path $HudDir "hooks"
+if (-not (Test-Path $HudHooksDir)) { New-Item -ItemType Directory -Path $HudHooksDir -Force | Out-Null }
+Copy-Item (Join-Path $RepoRoot "hooks\*") $HudHooksDir -Recurse -Force
+
 $HudConfigDest = Join-Path $HudDir "hud_config.json"
 if (-not (Test-Path $HudConfigDest)) {
     Copy-Item (Join-Path $RepoRoot "bin\hud_config.json") $HudConfigDest -Force
     Write-Host "  [OK] Initialized default configuration in $HudDir" -ForegroundColor Green
 }
-Write-Host "  [OK] Deployed subsystem components to $HudDir" -ForegroundColor Green
+Write-Host "  [OK] Deployed subsystem components and hooks to $HudDir" -ForegroundColor Green
 
 Write-Host "[2/3] Configuring Antigravity settings..." -ForegroundColor Yellow
 $SettingsCandidates = @(

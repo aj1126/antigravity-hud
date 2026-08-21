@@ -1,4 +1,6 @@
 {
+  "name": "4-Line Command Center",
+  "description": "High-density 4-tier statusline displaying full system telemetry, security, and milestones",
   "lines": 4,
   "two_line": true,
   "separator": "│",

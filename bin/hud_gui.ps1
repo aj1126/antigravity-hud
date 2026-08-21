@@ -5,13 +5,25 @@
 # item_styles), non-destructive JSON persistence, fork advisory item,
 # dynamic compact-mode live preview.
 # =====================================================================
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
+try {
+    Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
+    Add-Type -AssemblyName System.Drawing -ErrorAction Stop
+} catch {
+    Write-Error "Windows Forms is not available in the current environment."
+    exit 1
+}
 
-[System.Windows.Forms.Application]::EnableVisualStyles()
+try {
+    [System.Windows.Forms.Application]::SetHighDpiMode([System.Windows.Forms.HighDpiMode]::PerMonitorV2)
+} catch {}
+
+try {
+    [System.Windows.Forms.Application]::EnableVisualStyles()
+} catch {}
 
 $configCandidates = @(
     $env:HUD_CONFIG_PATH,
+    (Join-Path $HOME ".gemini\scripts\hud_config.json"),
     (Join-Path $HOME ".gemini\hud\hud_config.json"),
     (Join-Path $HOME ".gemini\hud_config.json"),
     (Join-Path $PSScriptRoot "hud_config.json"),
@@ -20,7 +32,7 @@ $configCandidates = @(
 
 $configPath = $configCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $configPath) {
-    $configPath = Join-Path $HOME ".gemini\hud\hud_config.json"
+    $configPath = Join-Path $HOME ".gemini\scripts\hud_config.json"
 }
 
 # -----------------------------------------------------------------------
@@ -786,6 +798,14 @@ $btnSave.Add_Click({
     $json      = $saveData | ConvertTo-Json -Depth 6
     $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
     [System.IO.File]::WriteAllText($configPath, $json, $utf8NoBom)
+
+    # Dual-sync to ~/.gemini/hud/hud_config.json if present
+    $hudMirror = Join-Path $HOME ".gemini\hud\hud_config.json"
+    if ($configPath -ne $hudMirror -and (Test-Path (Split-Path $hudMirror -Parent))) {
+        try {
+            [System.IO.File]::WriteAllText($hudMirror, $json, $utf8NoBom)
+        } catch {}
+    }
 
     [System.Windows.Forms.MessageBox]::Show(
         "HUD configuration saved to:`n$configPath",

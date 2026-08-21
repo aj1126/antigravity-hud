@@ -3,9 +3,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18.0.0-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](#)
-[![Version](https://img.shields.io/badge/Version-v2.0.0-brightgreen.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-v2.3.0-brightgreen.svg)](CHANGELOG.md)
 
-A high-performance, real-time, multi-line TUI statusline HUD, live telemetry monitor, and drag-and-drop layout configurator designed specifically for **Antigravity AI Agent** coding workflows.
+A high-performance, real-time, multi-line TUI statusline HUD, live telemetry monitor, drag-and-drop layout configurator, bidirectional repository synchronizer, and zero-quota lifecycle guard designed specifically for **Antigravity AI Agent** coding workflows.
 
 ---
 
@@ -26,21 +26,24 @@ Ctx: [██░░] 22% ⚡93% │ 5h: 53% (3.5h) │ Wk: 27%
 
 ---
 
-## ✨ Features
+## ✨ Core Features
 
-- **📐 1 to 4 Configurable Lines (`lines: 1..4`)**: Scale your footer footer density from ultra-minimal single-line to a 4-tier cockpit.
+- **📐 1 to 4 Configurable Lines (`lines: 1..4`)**: Scale your footer density from ultra-minimal single-line to a 4-tier cockpit.
 - **🗜️ Per-Item & Global Text Shortening (`full`, `short`, `minimal`, `auto`)**: Keep all essential metrics visible in narrow split panes without text clipping.
 - **📊 Real-Time Context & Prompt Cache Telemetry**: Visual block progress bars, token count summaries, and cache hit efficiency rates.
 - **⏳ Dual Rolling Quota Reserves**: Simultaneous tracking of your 5-hour rolling rate limits with countdown reset timers (`↻ 3h 14m`) and weekly quotas.
 - **⏱️ Color-Graded Session Uptime**: Dynamic elapsed time tracking with configurable color thresholds (Green $\rightarrow$ Yellow $\rightarrow$ Magenta $\rightarrow$ Red).
 - **🍴 Clean-State Milestone Fork Advisory (`hud fork`)**: Context and step-aware fork recommendations strictly adhering to the **Golden Rule** (suppressed during in-flight dirty edits, active exclusively at clean milestone boundaries).
-- **🎨 Drag-and-Drop Web GUI Configurator (`hud gui`)**: Zero-dependency local web configurator on `http://localhost:3847` with live simulated terminal previews.
+- **🎨 Native Windows Forms & Web GUI Configurators (`hud gui`)**: Zero-dependency lightweight configurator with live simulated previews and dual-sync saving.
+- **🔄 Bidirectional Repository Sync & Backup (`hud backup` / `Sync-AgyHud.ps1 -Backup`)**: Work natively in your active environment (`~/.gemini/scripts/`) and seamlessly backup/deploy changes to your GitHub repo (`B:\Repos\antigravity-hud/`).
+- **🛡️ Zero-Quota Lifecycle Hooks Suite**: Prettier formatting, BOM auto-stripping, pre-flight sanity checks, destructive command blocking, and detached post-exit logging with native Windows 11 Toast notifications.
+- **🩺 Self-Healing Runtime Integrity & Drift Detection (`hud check` / `hud repair`)**: Automated SHA-256 code file parity checks, BOM stripping, and non-destructive schema hydration.
 - **🏷️ Terminal Window & Tab Title Synchronization**: Broadcasts ANSI OSC 0 escape sequences to keep your Windows Terminal tabs labeled with project and workspace names.
-- **⚡ Zero External Dependencies**: Powered entirely by native Node.js core modules.
+- **⚡ Zero External Dependencies**: Powered entirely by native Node.js and PowerShell core modules.
 
 ---
 
-## 📦 Installation
+## 📦 Installation & Deployment
 
 ### Quick 1-Click PowerShell Setup (Windows)
 
@@ -52,118 +55,124 @@ cd B:\Repos\antigravity-hud
 .\install.ps1
 ```
 
-The installer automatically copies `hud.js` and `hud_gui.html` to `~/.gemini/scripts/` and registers the `statusLine` command hook in your Antigravity settings.
+The installer automatically:
+1. Deploys runtime scripts (`hud.js`, `hud_gui.ps1`, `hud_gui.html`, `Sync-AgyHud.ps1`) to `~/.gemini/scripts/`.
+2. Deploys the zero-quota lifecycle hooks suite to `~/.gemini/scripts/hooks/`.
+3. Registers the clean unquoted `statusLine` hook in your Antigravity `settings.json`.
 
 ---
 
-## ⚙️ Configuration
+## 🔄 Bidirectional Synchronization & Repository Backup
 
-Your configuration lives at `~/.gemini/hud_config.json`:
+Work with complete local autonomy in your active runtime directory (`~/.gemini/scripts/`), while keeping your GitHub repository (`B:\Repos\antigravity-hud/`) 100% in sync:
 
-```json
-{
-  "lines": 2,
-  "separator": "│",
-  "compact_mode": "auto",
-  "line1": [
-    "workspace",
-    "git_status",
-    "model",
-    "state",
-    "auth",
-    "sandbox",
-    "session"
-  ],
-  "line2": [
-    "context",
-    "fork",
-    "quota_5h",
-    "quota_weekly",
-    "mcp",
-    "subagents",
-    "tasks",
-    "artifacts",
-    "queue"
-  ],
-  "line3": [],
-  "line4": [],
-  "disabled": [],
-  "item_styles": {
-    "model": "short",
-    "context": "short"
-  },
-  "session_uptime": {
-    "show_seconds": true,
-    "thresholds": [
-      { "max_minutes": 15, "color": "green" },
-      { "max_minutes": 45, "color": "yellow" },
-      { "max_minutes": 90, "color": "magenta" },
-      { "max_minutes": null, "color": "red" }
-    ]
-  },
-  "fork_advisory": {
-    "enabled": true,
-    "require_clean_git": true,
-    "warning_percent": 60,
-    "alert_percent": 75,
-    "critical_percent": 90,
-    "step_warning": 300,
-    "step_alert": 500,
-    "step_critical": 800
-  }
-}
+```powershell
+# 1. Compare differences between active runtime and GitHub repo
+hud diff
+# or in PowerShell:
+Sync-AgyHud -Diff
+
+# 2. Backup active runtime modifications back to the GitHub repo
+hud backup
+# or in PowerShell with automatic git commit:
+Sync-AgyHud -Backup -Commit -Message "feat: add new custom hud widget"
+
+# 3. Deploy updates from repo to active runtime targets
+hud deploy
+# or in PowerShell:
+Sync-AgyHud -Deploy
+
+# 4. Continuous Live 2-Way Watcher (during rapid refactoring)
+Sync-AgyHud -Watch
 ```
+
+---
+
+## 🛡️ Zero-Quota Lifecycle Hooks Suite
+
+Antigravity HUD includes 4 local, zero-token lifecycle hooks deployed in `~/.gemini/scripts/hooks/`:
+
+1. **`post_tool_format.js`**: Automatically formats edited files via local Prettier / ast-grep and strips harmful UTF-8 BOM preambles with 0 LLM token cost.
+2. **`on_session_start.ps1`**: Silent pre-flight sanity check and `.workspace_context/resume-points/` auto-discovery.
+3. **`pre_tool_guard.js`**: Intercepts destructive git commands (`git reset --hard`, `git push --force`, `rm -rf`) and monitors rolling quota exhaustion (< 15%).
+4. **`on_session_exit.ps1`**: Detached background quad-sync worker that creates session resume points, quad-syncs devlogs, triggers git commits, and delivers native Windows 11 Toast notifications after console closure.
+
+---
+
+## 📚 Documentation Catalog
+
+For detailed guides, architectural specifications, and full schemas:
+* 🏗️ [**System Architecture**](docs/ARCHITECTURE.md) — Multi-tier pipeline, stdio data flow, and sync engine design
+* ⌨️ [**CLI Command Reference**](docs/CLI_REFERENCE.md) — Comprehensive guide to all 20+ subcommands and flags
+* 🧩 [**Telemetry Items Guide**](docs/TELEMETRY_ITEMS.md) — Complete 16-metric catalog, data paths, and condensation modes
+* ⚙️ [**Configuration Schema**](docs/CONFIGURATION_SCHEMA.md) — `hud_config.json` options, validation rules, and presets
+* 🛡️ [**Lifecycle Hooks Guide**](docs/LIFECYCLE_HOOKS.md) — Zero-quota pre/post hooks, logging schema, and notifications
 
 ---
 
 ## ⌨️ CLI Command Reference
 
+<!-- AUTO-DOC:CLI_TABLE:START -->
 | Command | Description | Example |
 | :--- | :--- | :--- |
-| `hud` / `hud list` | Inspect active layout, enabled items, and styles | `hud list` |
-| `hud lines <1-4>` | Set number of display lines (1 to 4) | `hud lines 3` |
-| `hud compact <mode>` | Set global compact mode (`auto`, `full`, `short`, `minimal`) | `hud compact short` |
-| `hud style <item> <style>` | Set style override for a specific item | `hud style context short` |
-| `hud style reset` | Reset all item style overrides to auto | `hud style reset` |
-| `hud gui` | Launch local Drag-and-Drop Web Configurator | `hud gui` |
-| `hud uptime` | View/configure session uptime color thresholds | `hud uptime thresholds 15:green,45:yellow,max:red` |
-| `hud fork` | View Fork Advisory status and thresholds | `hud fork status` |
-| `hud fork snooze [min]` | Snooze fork warning badge (default 30m) | `hud fork snooze 45` |
-| `hud title <name>` | Set custom session & terminal tab title | `hud title "Feature Refactor"` |
-| `hud ticker <sec>` | Adjust statusline refresh interval | `hud ticker 1` |
-| `hud toggle <item>` | Toggle an item ON or OFF | `hud toggle sandbox` |
-| `hud edit` | Open `hud_config.json` in default text editor | `hud edit` |
-| `hud reset` | Revert configuration to defaults | `hud reset` |
+| `hud` | Inspect active multi-line layout configuration, enabled items, line slots, and active item styles. | `hud` |
+| `hud lines` | Set total number of active statusline display lines (1 to 4). | `hud lines 4` |
+| `hud compact` | Set global text condensation mode across all statusline elements. | `hud compact short` |
+| `hud style` | Set per-item style override (takes precedence over global text mode). | `hud style context short` |
+| `hud style reset` | Clear all per-item formatting overrides and revert to global condensation mode. | `hud style reset` |
+| `hud preset` | Manage and apply pre-configured statusline layout presets. | `hud preset load 4line_command_center` |
+| `hud toggle` | Toggle an item between enabled and disabled status. | `hud toggle sandbox` |
+| `hud enable` | Enable a disabled item and optionally place it on a specific line slot. | `hud enable auth line4` |
+| `hud disable` | Disable an item and remove it from active statusline output. | `hud disable queue` |
+| `hud fork` | View or configure Milestone Fork Advisory badge, thresholds, and snooze state. | `hud fork snooze 30` |
+| `hud uptime` | Configure session elapsed uptime formatting and color thresholds. | `hud uptime show-seconds on` |
+| `hud title` | Set a custom workspace title or reset back to default folder/project identity. | `hud title "Feature Refactor"` |
+| `hud sync-projects` | Scan Antigravity project definitions and synchronize PascalCase/kebab-case/snake_case aliases for `/fork`. | `hud sync-projects` |
+| `hud ticker` | Update Antigravity `settings.json` statusLine polling interval. | `hud ticker 1` |
+| `hud diff` | Compare cryptographic SHA-256 parity between active runtime files and repository. | `hud diff` |
+| `hud backup` | Safely copy active runtime edits back into the repository workspace. | `hud backup` |
+| `hud deploy` | Deploy canonical repository components to active runtime directories (`~/.gemini/scripts/`, `~/.gemini/hud/`). | `hud deploy` |
+| `hud check` | Perform complete health, drift detection, BOM preamble, and settings wiring check. | `hud check` |
+| `hud repair` | Trigger self-healing auto-repair: strips BOM preambles, restores missing files, and hydratres missing schema keys. | `hud repair` |
+| `hud gui` | Launch native Windows Forms interactive statusline layout configurator. | `hud gui` |
+| `hud edit` | Open `hud_config.json` in default system text editor (VS Code, Notepad). | `hud edit` |
+| `hud reset` | Reset statusline configuration back to factory default 4-Line Command Center layout. | `hud reset` |
+| `hud help` | Print complete formatted CLI command manual with colored examples. | `hud help` |
+
+<!-- AUTO-DOC:CLI_TABLE:END -->
 
 ---
 
-## 🧩 Supported Statusline Elements
+## 🧩 Supported Statusline Elements (16 Telemetry Metrics)
 
+<!-- AUTO-DOC:ITEMS_TABLE:START -->
 | Item Key | Description | Full Sample | Minimal Sample |
 | :--- | :--- | :--- | :--- |
-| **`workspace`** | Folder, project & Git branch with ahead/behind | `📁 App (⎇ main * ↑1)` | `📁 App` |
-| **`git_status`**| Working directory Clean / Dirty status | `🌿 Clean` / `⚠️ Dirty (+1)` | `🌿` / `⚠️` |
-| **`model`** | Active AI model & reasoning effort | `Gemini 3.7 Flash [🧠 HIGH]` | `Flash` |
-| **`state`** | Agent lifecycle status | `[WORKING]` / `[IDLE]` | `●` |
-| **`session`** | Real-time session elapsed uptime | `⏱️ 1h 24m 15s` | `⏱️ 84m` |
-| **`context`** | Visual progress bar, tokens & cache hit rate | `Ctx: [██░░] 22% (229k) (⚡ 93%)` | `Ctx: 22%` |
-| **`fork`** | Milestone-aware fork advisory badge | `🍴 Milestone: consider /fork (65%)` | `🍴 /fork` |
-| **`quota_5h`** | 5-hour rolling token reserve & countdown | `Quota: 53% (↻ 3h 34m)` | `5h: 53%` |
-| **`quota_weekly`**| Weekly quota token reserve % | `Wk: 27%` | `Wk: 27%` |
-| **`mcp`** | Active Model Context Protocol tools | `🔌 15 MCP` | `🔌 15` |
-| **`tasks`** | Active background processes | `⚙️ 2 tasks` | `⚙️ 2` |
-| **`subagents`** | Running background subagent workers | `🤖 1 subagent` | `🤖 1` |
-| **`artifacts`** | Persisted brain artifact documents | `📝 7` | `📝 7` |
-| **`queue`** | Pending turns & messages | `⏳ 2 queued` | `⏳ 2` |
-| **`auth`** | Security authentication provider | `🔑 API-Key` / `🔑 OAuth` | `🔑` |
-| **`sandbox`** | Container sandbox security status | `🛡️ Sandbox` | `🛡️` |
+| **`workspace`** | Workspace & Git Branch — Active workspace folder, Antigravity project name alias, and Git branch with ahead/behind indicators (`↑1 ↓2`) | `📁 MyProject › Core (⎇ main * ↑1)` | `📁 Core` |
+| **`git_status`** | Git Clean / Dirty Status — Working directory state indicating whether uncommitted changes exist (`+staged`, `~unstaged`, `?untracked`) | `🌿 Clean / ⚠️ Dirty (+1 ~2)` | `🌿 / ⚠️` |
+| **`model`** | Model & Reasoning Effort — Active AI model display name and reasoning effort level (`[🧠 HIGH]`, `[🧠 LOW]`) | `Gemini 3.7 Flash [🧠 HIGH]` | `Flash` |
+| **`state`** | Agent Lifecycle State — Current agent execution state (`[WORKING]`, `[IDLE]`, `[WAITING]`, `[ERROR]`) | `[WORKING]` | `● (colored)` |
+| **`context`** | Context Window & Prompt Cache — Real-time context window token utilization percentage, token count summary, visual block bar, and prompt cache hit rate | `Ctx: ██░░░░░░░░ 22% (229k tok) (⚡ 93% Cache)` | `Ctx: 22%` |
+| **`quota_5h`** | 5-Hour Rolling Quota Reserve — Active 5-hour rolling token reserve percentage and countdown reset timer (`↻ 3h 14m`) | `Quota: 53% (↻ 3h 34m)` | `5h: 53%` |
+| **`quota_weekly`** | Weekly Quota Reserve — Weekly secondary quota reserve percentage across Gemini or 3P providers | `Wk: 80%` | `80%` |
+| **`session`** | Session Elapsed Uptime — Color-graded elapsed time since session start with optional seconds display and configurable threshold bands | `⏱️ 1h 24m 15s` | `⏱️ 84m` |
+| **`mcp`** | Registered MCP Servers — Count of connected Model Context Protocol (MCP) tool servers | `🔌 15 MCP` | `🔌 15` |
+| **`tasks`** | Running Background Tasks — Count of active, uncompleted background subshell tasks | `⚙️ 2 tasks` | `⚙️ 2` |
+| **`subagents`** | Active Subagents — Count of running background subagents and specialized workers | `🤖 1 subagent` | `🤖 1` |
+| **`artifacts`** | Generated Artifacts Count — Number of brain markdown artifact documents created in the active session | `📝 7 artifacts` | `📝 7` |
+| **`queue`** | Queued Input Messages — Count of pending user-queued prompt turns waiting for execution | `⏳ 2 queued` | `⏳ 2` |
+| **`sandbox`** | Sandbox Security Mode — Container / command execution sandbox protection indicator | `🛡️ Sandbox` | `🛡️` |
+| **`auth`** | Authentication Provider — Active authentication provider badge (`API-Key`, `OAuth`, `Vertex`) | `🔑 API-Key` | `🔑` |
+| **`fork`** | Milestone Fork Advisory — Context and step-aware recommendation badge advising when to run `/fork <project>` at clean milestone boundaries | `🍴 Milestone: consider /fork (65% • 312s)` | `🍴 /fork` |
+
+<!-- AUTO-DOC:ITEMS_TABLE:END -->
 
 ---
 
 ## 🔒 Security & Privacy
 
 `antigravity-hud` is designed with a **zero-leak** privacy architecture:
-- **No Telemetry Outbound**: Runs 100% locally on your machine without external analytics or network calls.
+- **No Outbound Telemetry**: Runs 100% locally on your machine without external analytics or network calls.
 - **Dynamic Path Resolution**: Resolves all user profiles dynamically using environment variables (`$HOME`, `$env:USERPROFILE`).
 - **Zero Credentials**: Never inspects, extracts, or exposes raw API keys, tokens, or private secrets.
 
