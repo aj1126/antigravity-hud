@@ -46,9 +46,7 @@ const canonicalFiles = {
 function seedSandbox() {
   for (const [fname, src] of Object.entries(canonicalFiles)) {
     if (fs.existsSync(src)) {
-      if (fname !== 'hud_config.json') {
-        fs.copyFileSync(src, path.join(mockScriptsDir, fname));
-      }
+      fs.copyFileSync(src, path.join(mockScriptsDir, fname));
       fs.copyFileSync(src, path.join(mockHudDir, fname));
     }
   }

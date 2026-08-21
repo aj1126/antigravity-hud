@@ -331,7 +331,7 @@ function performHealthCheck(repair = false) {
   const settingsPath = process.env.HUD_TEST_SETTINGS_PATH || path.join(homeDir, '.gemini', 'settings.json');
 
   const targets = [
-    { name: 'scripts', dir: scriptsDir, files: ['hud.js', 'hud_gui.ps1', 'hud_gui.html'] },
+    { name: 'scripts', dir: scriptsDir, files: ['hud.js', 'hud_gui.ps1', 'hud_gui.html', 'hud_config.json'] },
     { name: 'hud', dir: hudDir, files: ['hud.js', 'hud_gui.ps1', 'hud_gui.html', 'hud_config.json'] }
   ];
 
@@ -384,8 +384,8 @@ function performHealthCheck(repair = false) {
 
   // 3. Check JSON schema completeness
   const cfgCandidatePaths = [
-    path.join(hudDir, 'hud_config.json'),
     path.join(scriptsDir, 'hud_config.json'),
+    path.join(hudDir, 'hud_config.json'),
     path.join(homeDir, '.gemini', 'hud_config.json')
   ];
   for (const cp of cfgCandidatePaths) {
@@ -459,33 +459,39 @@ function performHealthCheck(repair = false) {
       }
     }
 
-    // Auto-hydrate hud_config.json
-    const activeCfgPath = path.join(hudDir, 'hud_config.json');
+    // Auto-hydrate hud_config.json across targets
+    const cfgPathsToHydrate = [
+      path.join(scriptsDir, 'hud_config.json'),
+      path.join(hudDir, 'hud_config.json')
+    ];
     const seedCfg = canonicalMap['hud_config.json'];
-    if (!fs.existsSync(activeCfgPath) && seedCfg && fs.existsSync(seedCfg)) {
-      fs.copyFileSync(seedCfg, activeCfgPath);
-      report.repaired.push(`Initialized default configuration at ${activeCfgPath}`);
-    } else if (fs.existsSync(activeCfgPath)) {
-      try {
-        const raw = fs.readFileSync(activeCfgPath, 'utf8');
-        const parsed = JSON.parse(raw);
-        const hydrated = {
-          lines: typeof parsed.lines === 'number' ? parsed.lines : DEFAULT_CONFIG.lines,
-          two_line: typeof parsed.two_line === 'boolean' ? parsed.two_line : DEFAULT_CONFIG.two_line,
-          separator: parsed.separator || DEFAULT_CONFIG.separator,
-          compact_mode: parsed.compact_mode || DEFAULT_CONFIG.compact_mode,
-          line1: Array.isArray(parsed.line1) ? parsed.line1 : DEFAULT_CONFIG.line1,
-          line2: Array.isArray(parsed.line2) ? parsed.line2 : DEFAULT_CONFIG.line2,
-          line3: Array.isArray(parsed.line3) ? parsed.line3 : DEFAULT_CONFIG.line3,
-          line4: Array.isArray(parsed.line4) ? parsed.line4 : DEFAULT_CONFIG.line4,
-          disabled: Array.isArray(parsed.disabled) ? parsed.disabled : DEFAULT_CONFIG.disabled,
-          item_styles: typeof parsed.item_styles === 'object' && parsed.item_styles !== null ? parsed.item_styles : {},
-          session_uptime: { ...DEFAULT_CONFIG.session_uptime, ...(parsed.session_uptime || {}) },
-          fork_advisory: { ...DEFAULT_CONFIG.fork_advisory, ...(parsed.fork_advisory || {}) }
-        };
-        fs.writeFileSync(activeCfgPath, JSON.stringify(hydrated, null, 2), 'utf8');
-        report.repaired.push(`Hydrated configuration schema in ${activeCfgPath}`);
-      } catch (_) {}
+
+    for (const activeCfgPath of cfgPathsToHydrate) {
+      if (!fs.existsSync(activeCfgPath) && seedCfg && fs.existsSync(seedCfg)) {
+        fs.copyFileSync(seedCfg, activeCfgPath);
+        report.repaired.push(`Initialized default configuration at ${activeCfgPath}`);
+      } else if (fs.existsSync(activeCfgPath)) {
+        try {
+          const raw = fs.readFileSync(activeCfgPath, 'utf8');
+          const parsed = JSON.parse(raw);
+          const hydrated = {
+            lines: typeof parsed.lines === 'number' ? parsed.lines : DEFAULT_CONFIG.lines,
+            two_line: typeof parsed.two_line === 'boolean' ? parsed.two_line : DEFAULT_CONFIG.two_line,
+            separator: parsed.separator || DEFAULT_CONFIG.separator,
+            compact_mode: parsed.compact_mode || DEFAULT_CONFIG.compact_mode,
+            line1: Array.isArray(parsed.line1) ? parsed.line1 : DEFAULT_CONFIG.line1,
+            line2: Array.isArray(parsed.line2) ? parsed.line2 : DEFAULT_CONFIG.line2,
+            line3: Array.isArray(parsed.line3) ? parsed.line3 : DEFAULT_CONFIG.line3,
+            line4: Array.isArray(parsed.line4) ? parsed.line4 : DEFAULT_CONFIG.line4,
+            disabled: Array.isArray(parsed.disabled) ? parsed.disabled : DEFAULT_CONFIG.disabled,
+            item_styles: typeof parsed.item_styles === 'object' && parsed.item_styles !== null ? parsed.item_styles : {},
+            session_uptime: { ...DEFAULT_CONFIG.session_uptime, ...(parsed.session_uptime || {}) },
+            fork_advisory: { ...DEFAULT_CONFIG.fork_advisory, ...(parsed.fork_advisory || {}) }
+          };
+          fs.writeFileSync(activeCfgPath, JSON.stringify(hydrated, null, 2), 'utf8');
+          report.repaired.push(`Hydrated configuration schema in ${activeCfgPath}`);
+        } catch (_) {}
+      }
     }
 
     // Auto-repair settings.json hook
