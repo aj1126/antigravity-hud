@@ -1,0 +1,38 @@
+{
+  "name": "1-Line Compact Cockpit",
+  "description": "Ultra-condensed single-line statusline for minimal footprint",
+  "lines": 1,
+  "two_line": false,
+  "separator": "│",
+  "compact_mode": "short",
+  "line1": [
+    "workspace",
+    "git_status",
+    "model",
+    "context",
+    "quota_5h",
+    "session"
+  ],
+  "line2": [],
+  "line3": [],
+  "line4": [],
+  "disabled": [],
+  "item_styles": {
+    "model": "minimal",
+    "context": "minimal",
+    "workspace": "short"
+  },
+  "session_uptime": {
+    "show_seconds": false
+  },
+  "fork_advisory": {
+    "enabled": true,
+    "require_clean_git": true,
+    "warning_percent": 60,
+    "alert_percent": 75,
+    "critical_percent": 90,
+    "step_warning": 300,
+    "step_alert": 500,
+    "step_critical": 800
+  }
+}

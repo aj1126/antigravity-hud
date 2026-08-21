@@ -39,15 +39,23 @@ if (-not (Test-Path $ScriptsConfigDest)) {
     Copy-Item (Join-Path $RepoRoot "bin\hud_config.json") $ScriptsConfigDest -Force
 }
 
+$ScriptsPresetsDir = Join-Path $ScriptsDir "presets"
+if (-not (Test-Path $ScriptsPresetsDir)) { New-Item -ItemType Directory -Path $ScriptsPresetsDir -Force | Out-Null }
+Copy-Item (Join-Path $RepoRoot "presets\*") $ScriptsPresetsDir -Recurse -Force
+
 $ScriptsHooksDir = Join-Path $ScriptsDir "hooks"
 if (-not (Test-Path $ScriptsHooksDir)) { New-Item -ItemType Directory -Path $ScriptsHooksDir -Force | Out-Null }
 Copy-Item (Join-Path $RepoRoot "hooks\*") $ScriptsHooksDir -Recurse -Force
-Write-Host "  [OK] Deployed runtime scripts, hooks, and Sync-AgyHud to $ScriptsDir" -ForegroundColor Green
+Write-Host "  [OK] Deployed runtime scripts, hooks, presets, and Sync-AgyHud to $ScriptsDir" -ForegroundColor Green
 
 # Copy to dedicated ~/.gemini/hud/
 Copy-Item (Join-Path $RepoRoot "bin\hud.js") (Join-Path $HudDir "hud.js") -Force
 Copy-Item (Join-Path $RepoRoot "bin\hud_gui.ps1") (Join-Path $HudDir "hud_gui.ps1") -Force
 Copy-Item (Join-Path $RepoRoot "web\hud_gui.html") (Join-Path $HudDir "hud_gui.html") -Force
+
+$HudPresetsDir = Join-Path $HudDir "presets"
+if (-not (Test-Path $HudPresetsDir)) { New-Item -ItemType Directory -Path $HudPresetsDir -Force | Out-Null }
+Copy-Item (Join-Path $RepoRoot "presets\*") $HudPresetsDir -Recurse -Force
 
 $HudHooksDir = Join-Path $HudDir "hooks"
 if (-not (Test-Path $HudHooksDir)) { New-Item -ItemType Directory -Path $HudHooksDir -Force | Out-Null }

@@ -227,9 +227,34 @@ runTest('Engine: empty stdio fallback produces ready state without crash', () =>
   assert(res.stdout.length > 0);
 });
 
-// Cleanup test scratch
+// 13. CLI: hud preset list
+runTest('CLI: hud preset list displays saved layout presets', () => {
+  const res = spawnSync('node', [hudScriptPath, 'preset', 'list'], { env, encoding: 'utf8' });
+  assert.strictEqual(res.status, 0);
+  const clean = stripAnsi(res.stdout);
+  assert(clean.includes('=== Antigravity HUD: Available Layout Presets ==='));
+  assert(clean.includes('4line_command_center'));
+});
+
+// 14. CLI: hud preset save and load
+runTest('CLI: hud preset save and load applies custom layout', () => {
+  const saveRes = spawnSync('node', [hudScriptPath, 'preset', 'save', 'test_custom_preset'], { env, encoding: 'utf8' });
+  assert.strictEqual(saveRes.status, 0);
+
+  const loadRes = spawnSync('node', [hudScriptPath, 'preset', 'load', 'test_custom_preset'], { env, encoding: 'utf8' });
+  assert.strictEqual(loadRes.status, 0);
+  assert(loadRes.stdout.includes('Applied layout preset'));
+});
+
+// Cleanup test scratch & test presets
 try {
   fs.rmSync(tempTestDir, { recursive: true, force: true });
+  const repoTestPreset = path.join(__dirname, '..', 'presets', 'test_custom_preset.json');
+  if (fs.existsSync(repoTestPreset)) fs.unlinkSync(repoTestPreset);
+  const homeTestPreset1 = path.join(homeDir, '.gemini', 'scripts', 'presets', 'test_custom_preset.json');
+  if (fs.existsSync(homeTestPreset1)) fs.unlinkSync(homeTestPreset1);
+  const homeTestPreset2 = path.join(homeDir, '.gemini', 'hud', 'presets', 'test_custom_preset.json');
+  if (fs.existsSync(homeTestPreset2)) fs.unlinkSync(homeTestPreset2);
 } catch (_) {}
 
 console.log(`\nResults: ${passed} / ${total} tests passed.\n`);

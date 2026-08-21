@@ -1,7 +1,7 @@
 {
-  "name": "4-Line Command Center",
-  "description": "High-density 4-tier statusline displaying full system telemetry, security, and milestones",
-  "lines": 4,
+  "name": "3-Line Cockpit",
+  "description": "Balanced 3-tier layout separating workspace identity, resource quotas, and background workers",
+  "lines": 3,
   "two_line": true,
   "separator": "│",
   "compact_mode": "auto",
@@ -14,43 +14,23 @@
   "line2": [
     "context",
     "quota_5h",
-    "quota_weekly"
+    "quota_weekly",
+    "session"
   ],
   "line3": [
     "mcp",
     "tasks",
     "subagents",
     "artifacts",
-    "queue"
-  ],
-  "line4": [
+    "queue",
     "sandbox",
-    "auth",
-    "session",
-    "fork"
+    "auth"
   ],
+  "line4": [],
   "disabled": [],
   "item_styles": {},
   "session_uptime": {
-    "show_seconds": true,
-    "thresholds": [
-      {
-        "max_minutes": 15,
-        "color": "green"
-      },
-      {
-        "max_minutes": 45,
-        "color": "yellow"
-      },
-      {
-        "max_minutes": 90,
-        "color": "magenta"
-      },
-      {
-        "max_minutes": null,
-        "color": "red"
-      }
-    ]
+    "show_seconds": true
   },
   "fork_advisory": {
     "enabled": true,

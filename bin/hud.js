@@ -319,7 +319,7 @@ function getRepoPath() {
 }
 
 function getBidirectionalMapping(repoRoot, scriptsDir) {
-  return [
+  const base = [
     { relRepo: path.join('bin', 'hud.js'), relActive: 'hud.js', type: 'code' },
     { relRepo: path.join('bin', 'hud_gui.ps1'), relActive: 'hud_gui.ps1', type: 'code' },
     { relRepo: path.join('bin', 'hud_config.json'), relActive: 'hud_config.json', type: 'config' },
@@ -329,7 +329,32 @@ function getBidirectionalMapping(repoRoot, scriptsDir) {
     { relRepo: path.join('hooks', 'on_session_start.ps1'), relActive: path.join('hooks', 'on_session_start.ps1'), type: 'hook' },
     { relRepo: path.join('hooks', 'pre_tool_guard.js'), relActive: path.join('hooks', 'pre_tool_guard.js'), type: 'hook' },
     { relRepo: path.join('hooks', 'on_session_exit.ps1'), relActive: path.join('hooks', 'on_session_exit.ps1'), type: 'hook' }
-  ].map(m => ({
+  ];
+
+  const presetNames = new Set();
+  const repoPresetsDir = path.join(repoRoot, 'presets');
+  const activePresetsDir = path.join(scriptsDir, 'presets');
+
+  if (fs.existsSync(repoPresetsDir)) {
+    try {
+      fs.readdirSync(repoPresetsDir).filter(f => f.endsWith('.json')).forEach(f => presetNames.add(f));
+    } catch (_) {}
+  }
+  if (fs.existsSync(activePresetsDir)) {
+    try {
+      fs.readdirSync(activePresetsDir).filter(f => f.endsWith('.json')).forEach(f => presetNames.add(f));
+    } catch (_) {}
+  }
+
+  for (const pf of presetNames) {
+    base.push({
+      relRepo: path.join('presets', pf),
+      relActive: path.join('presets', pf),
+      type: 'preset'
+    });
+  }
+
+  return base.map(m => ({
     ...m,
     repoPath: path.join(repoRoot, m.relRepo),
     activePath: path.join(scriptsDir, m.relActive)
@@ -452,16 +477,7 @@ function performBackup(options = {}) {
       const targetDir = path.dirname(m.repoPath);
       if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
 
-      if (m.type === 'config' && repoExists) {
-        const activeRaw = fs.readFileSync(m.activePath, 'utf8');
-        const activeParsed = JSON.parse(activeRaw);
-        const repoRaw = fs.readFileSync(m.repoPath, 'utf8');
-        const repoParsed = JSON.parse(repoRaw);
-        const merged = { ...repoParsed, ...activeParsed };
-        fs.writeFileSync(m.repoPath, JSON.stringify(merged, null, 2), 'utf8');
-      } else {
-        fs.copyFileSync(m.activePath, m.repoPath);
-      }
+      fs.copyFileSync(m.activePath, m.repoPath);
 
       if (hasUtf8Bom(m.repoPath)) {
         stripBomFromFile(m.repoPath);
@@ -546,6 +562,85 @@ function performDeploy(options = {}) {
   performHealthCheck(true);
 
   return report;
+}
+
+function getPresetsDirs() {
+  const repoPresets = path.join(getRepoPath(), 'presets');
+  const scriptsPresets = path.join(process.env.HUD_TEST_SCRIPTS_DIR || path.join(homeDir, '.gemini', 'scripts'), 'presets');
+  const hudPresets = path.join(process.env.HUD_TEST_HUD_DIR || path.join(homeDir, '.gemini', 'hud'), 'presets');
+  return { repoPresets, scriptsPresets, hudPresets };
+}
+
+function listAvailablePresets() {
+  const { repoPresets, scriptsPresets } = getPresetsDirs();
+  const found = new Map();
+
+  const searchDirs = [scriptsPresets, repoPresets].filter(d => fs.existsSync(d));
+  for (const d of searchDirs) {
+    try {
+      const files = fs.readdirSync(d).filter(f => f.endsWith('.json'));
+      for (const f of files) {
+        const id = f.replace(/\.json$/, '');
+        if (!found.has(id)) {
+          try {
+            const content = JSON.parse(fs.readFileSync(path.join(d, f), 'utf8'));
+            found.set(id, {
+              id,
+              name: content.name || id,
+              description: content.description || '',
+              lines: content.lines || 2,
+              path: path.join(d, f)
+            });
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+  }
+  return Array.from(found.values());
+}
+
+function saveCustomPreset(presetName, currentCfg) {
+  const cleanName = presetName.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+  const { repoPresets, scriptsPresets, hudPresets } = getPresetsDirs();
+
+  const presetPayload = {
+    name: presetName,
+    description: `Saved preset created on ${new Date().toISOString().split('T')[0]}`,
+    ...currentCfg
+  };
+
+  const targetDirs = [scriptsPresets, hudPresets, repoPresets];
+  for (const d of targetDirs) {
+    try {
+      if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+      fs.writeFileSync(path.join(d, `${cleanName}.json`), JSON.stringify(presetPayload, null, 2), 'utf8');
+    } catch (_) {}
+  }
+  return cleanName;
+}
+
+function loadCustomPreset(presetName) {
+  const cleanName = presetName.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+  const { scriptsPresets, repoPresets } = getPresetsDirs();
+
+  const candidates = [
+    path.join(scriptsPresets, `${cleanName}.json`),
+    path.join(repoPresets, `${cleanName}.json`),
+    path.join(scriptsPresets, `${presetName}.json`),
+    path.join(repoPresets, `${presetName}.json`)
+  ];
+
+  const matched = candidates.find(p => fs.existsSync(p));
+  if (!matched) return null;
+
+  try {
+    const raw = fs.readFileSync(matched, 'utf8');
+    const loaded = JSON.parse(raw);
+    saveConfig(loaded);
+    return loaded;
+  } catch (err) {
+    return null;
+  }
 }
 
 function getCanonicalFileMap() {
@@ -992,6 +1087,56 @@ if (args.length > 0) {
 
     console.log('\n\x1b[90mTip: Run `hud help` for usage examples or `hud edit` / `hud gui` to customize.\x1b[0m');
     process.exit(0);
+  }
+
+  if (cmd === 'preset' || cmd === 'presets' || cmd === 'layout') {
+    const sub = args[1]?.toLowerCase();
+    if (!sub || sub === 'list' || sub === 'ls') {
+      console.log('\x1b[1m\x1b[36m=== Antigravity HUD: Available Layout Presets ===\x1b[0m\n');
+      const presets = listAvailablePresets();
+      if (presets.length === 0) {
+        console.log('  \x1b[90mNo presets found in presets/ directory.\x1b[0m');
+      } else {
+        for (const p of presets) {
+          const isCurrent = cfg.lines === p.lines && JSON.stringify(cfg.line1) === JSON.stringify(p.line1);
+          const activeTag = isCurrent ? ' \x1b[32m[ACTIVE]\x1b[0m' : '';
+          console.log(`  • \x1b[1m\x1b[33m${p.id.padEnd(24)}\x1b[0m (${p.lines} line${p.lines > 1 ? 's' : ''}): ${p.name || p.id}${activeTag}`);
+          if (p.description) {
+            console.log(`    \x1b[90m${p.description}\x1b[0m`);
+          }
+        }
+      }
+      console.log('\n\x1b[90mUsage:\x1b[0m');
+      console.log('  hud preset load <name>    Apply a layout preset (e.g. hud preset load 4line_command_center)');
+      console.log('  hud preset save <name>    Save current active layout as a named preset');
+      process.exit(0);
+    }
+
+    if (sub === 'save') {
+      const pName = args[2];
+      if (!pName) {
+        console.error('Usage: hud preset save <name>');
+        process.exit(1);
+      }
+      const savedId = saveCustomPreset(pName, cfg);
+      console.log(`\x1b[32m✔ Current layout successfully saved as preset: "${savedId}"\x1b[0m`);
+      process.exit(0);
+    }
+
+    if (sub === 'load' || sub === 'apply' || sub === 'use' || sub === 'set') {
+      const pName = args[2];
+      if (!pName) {
+        console.error('Usage: hud preset load <name>');
+        process.exit(1);
+      }
+      const loaded = loadCustomPreset(pName);
+      if (!loaded) {
+        console.error(`Preset "${pName}" not found. Run 'hud preset list' to see available options.`);
+        process.exit(1);
+      }
+      console.log(`\x1b[32m✔ Applied layout preset "${pName}" (${loaded.lines || 2} line(s)).\x1b[0m`);
+      process.exit(0);
+    }
   }
 
   if (cmd === 'lines' || cmd === 'line-count') {
