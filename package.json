@@ -16,6 +16,9 @@
     "deploy": "node bin/hud.js deploy",
     "check": "node bin/hud.js check",
     "repair": "node bin/hud.js repair",
+    "docs": "node scripts/generate_docs.js",
+    "docs:check": "node scripts/generate_docs.js --check",
+    "test:bench": "node tests/hud_performance.test.js",
     "test": "pwsh -File tests/run_all_hud_tests.ps1"
   },
   "repository": {

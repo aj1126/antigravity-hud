@@ -99,52 +99,73 @@ Antigravity HUD includes 4 local, zero-token lifecycle hooks deployed in `~/.gem
 
 ---
 
+## 📚 Documentation Catalog
+
+For detailed guides, architectural specifications, and full schemas:
+* 🏗️ [**System Architecture**](docs/ARCHITECTURE.md) — Multi-tier pipeline, stdio data flow, and sync engine design
+* ⌨️ [**CLI Command Reference**](docs/CLI_REFERENCE.md) — Comprehensive guide to all 20+ subcommands and flags
+* 🧩 [**Telemetry Items Guide**](docs/TELEMETRY_ITEMS.md) — Complete 16-metric catalog, data paths, and condensation modes
+* ⚙️ [**Configuration Schema**](docs/CONFIGURATION_SCHEMA.md) — `hud_config.json` options, validation rules, and presets
+* 🛡️ [**Lifecycle Hooks Guide**](docs/LIFECYCLE_HOOKS.md) — Zero-quota pre/post hooks, logging schema, and notifications
+
+---
+
 ## ⌨️ CLI Command Reference
 
+<!-- AUTO-DOC:CLI_TABLE:START -->
 | Command | Description | Example |
 | :--- | :--- | :--- |
-| `hud` / `hud list` | Inspect active layout, enabled items, and styles | `hud list` |
-| `hud diff` | View side-by-side Active vs Repo synchronization status | `hud diff` |
-| `hud backup` | Backup active runtime files -> GitHub repository | `hud backup` |
-| `hud deploy` | Deploy repository updates -> active runtime directories | `hud deploy` |
-| `hud check` | Inspect SHA-256 cryptographic parity and runtime drift | `hud check` |
-| `hud repair` | Trigger automated self-healing and schema hydration | `hud repair` |
-| `hud lines <1-4>` | Set number of display lines (1 to 4) | `hud lines 3` |
-| `hud compact <mode>` | Set global compact mode (`auto`, `full`, `short`, `minimal`) | `hud compact short` |
-| `hud style <item> <style>` | Set style override for a specific item | `hud style context short` |
-| `hud style reset` | Reset all item style overrides to auto | `hud style reset` |
-| `hud gui` | Launch native WinForms & Web Layout Configurator | `hud gui` |
-| `hud uptime` | View/configure session uptime color thresholds | `hud uptime thresholds 15:green,45:yellow,max:red` |
-| `hud fork` | View Fork Advisory status and thresholds | `hud fork status` |
-| `hud fork snooze [min]` | Snooze fork warning badge (default 30m) | `hud fork snooze 45` |
-| `hud title <name>` | Set custom session & terminal tab title | `hud title "Feature Refactor"` |
-| `hud ticker <sec>` | Adjust statusline refresh interval | `hud ticker 1` |
-| `hud toggle <item>` | Toggle an item ON or OFF | `hud toggle sandbox` |
-| `hud edit` | Open `hud_config.json` in default text editor | `hud edit` |
-| `hud reset` | Revert configuration to defaults | `hud reset` |
+| `hud` | Inspect active multi-line layout configuration, enabled items, line slots, and active item styles. | `hud` |
+| `hud lines` | Set total number of active statusline display lines (1 to 4). | `hud lines 4` |
+| `hud compact` | Set global text condensation mode across all statusline elements. | `hud compact short` |
+| `hud style` | Set per-item style override (takes precedence over global text mode). | `hud style context short` |
+| `hud style reset` | Clear all per-item formatting overrides and revert to global condensation mode. | `hud style reset` |
+| `hud preset` | Manage and apply pre-configured statusline layout presets. | `hud preset load 4line_command_center` |
+| `hud toggle` | Toggle an item between enabled and disabled status. | `hud toggle sandbox` |
+| `hud enable` | Enable a disabled item and optionally place it on a specific line slot. | `hud enable auth line4` |
+| `hud disable` | Disable an item and remove it from active statusline output. | `hud disable queue` |
+| `hud fork` | View or configure Milestone Fork Advisory badge, thresholds, and snooze state. | `hud fork snooze 30` |
+| `hud uptime` | Configure session elapsed uptime formatting and color thresholds. | `hud uptime show-seconds on` |
+| `hud title` | Set a custom workspace title or reset back to default folder/project identity. | `hud title "Feature Refactor"` |
+| `hud sync-projects` | Scan Antigravity project definitions and synchronize PascalCase/kebab-case/snake_case aliases for `/fork`. | `hud sync-projects` |
+| `hud ticker` | Update Antigravity `settings.json` statusLine polling interval. | `hud ticker 1` |
+| `hud diff` | Compare cryptographic SHA-256 parity between active runtime files and repository. | `hud diff` |
+| `hud backup` | Safely copy active runtime edits back into the repository workspace. | `hud backup` |
+| `hud deploy` | Deploy canonical repository components to active runtime directories (`~/.gemini/scripts/`, `~/.gemini/hud/`). | `hud deploy` |
+| `hud check` | Perform complete health, drift detection, BOM preamble, and settings wiring check. | `hud check` |
+| `hud repair` | Trigger self-healing auto-repair: strips BOM preambles, restores missing files, and hydratres missing schema keys. | `hud repair` |
+| `hud gui` | Launch native Windows Forms interactive statusline layout configurator. | `hud gui` |
+| `hud edit` | Open `hud_config.json` in default system text editor (VS Code, Notepad). | `hud edit` |
+| `hud reset` | Reset statusline configuration back to factory default 4-Line Command Center layout. | `hud reset` |
+| `hud help` | Print complete formatted CLI command manual with colored examples. | `hud help` |
+
+<!-- AUTO-DOC:CLI_TABLE:END -->
 
 ---
 
 ## 🧩 Supported Statusline Elements (16 Telemetry Metrics)
 
+<!-- AUTO-DOC:ITEMS_TABLE:START -->
 | Item Key | Description | Full Sample | Minimal Sample |
 | :--- | :--- | :--- | :--- |
-| **`workspace`** | Folder, project & Git branch with ahead/behind | `📁 App (⎇ main * ↑1)` | `📁 App` |
-| **`git_status`**| Working directory Clean / Dirty status | `🌿 Clean` / `⚠️ Dirty (+1)` | `🌿` / `⚠️` |
-| **`model`** | Active AI model & reasoning effort | `Gemini 3.7 Flash [🧠 HIGH]` | `Flash` |
-| **`state`** | Agent lifecycle status | `[WORKING]` / `[IDLE]` | `●` |
-| **`session`** | Real-time session elapsed uptime | `⏱️ 1h 24m 15s` | `⏱️ 84m` |
-| **`context`** | Visual progress bar, tokens & cache hit rate | `Ctx: [██░░] 22% (229k) (⚡ 93%)` | `Ctx: 22%` |
-| **`fork`** | Milestone-aware fork advisory badge | `🍴 Milestone: consider /fork (65%)` | `🍴 /fork` |
-| **`quota_5h`** | 5-hour rolling token reserve & countdown | `Quota: 53% (↻ 3h 34m)` | `5h: 53%` |
-| **`quota_weekly`**| Weekly quota token reserve % | `Wk: 27%` | `Wk: 27%` |
-| **`mcp`** | Active Model Context Protocol tools | `🔌 15 MCP` | `🔌 15` |
-| **`tasks`** | Active background processes | `⚙️ 2 tasks` | `⚙️ 2` |
-| **`subagents`** | Running background subagent workers | `🤖 1 subagent` | `🤖 1` |
-| **`artifacts`** | Persisted brain artifact documents | `📝 7` | `📝 7` |
-| **`queue`** | Pending turns & messages | `⏳ 2 queued` | `⏳ 2` |
-| **`auth`** | Security authentication provider | `🔑 API-Key` / `🔑 OAuth` | `🔑` |
-| **`sandbox`** | Container sandbox security status | `🛡️ Sandbox` | `🛡️` |
+| **`workspace`** | Workspace & Git Branch — Active workspace folder, Antigravity project name alias, and Git branch with ahead/behind indicators (`↑1 ↓2`) | `📁 MyProject › Core (⎇ main * ↑1)` | `📁 Core` |
+| **`git_status`** | Git Clean / Dirty Status — Working directory state indicating whether uncommitted changes exist (`+staged`, `~unstaged`, `?untracked`) | `🌿 Clean / ⚠️ Dirty (+1 ~2)` | `🌿 / ⚠️` |
+| **`model`** | Model & Reasoning Effort — Active AI model display name and reasoning effort level (`[🧠 HIGH]`, `[🧠 LOW]`) | `Gemini 3.7 Flash [🧠 HIGH]` | `Flash` |
+| **`state`** | Agent Lifecycle State — Current agent execution state (`[WORKING]`, `[IDLE]`, `[WAITING]`, `[ERROR]`) | `[WORKING]` | `● (colored)` |
+| **`context`** | Context Window & Prompt Cache — Real-time context window token utilization percentage, token count summary, visual block bar, and prompt cache hit rate | `Ctx: ██░░░░░░░░ 22% (229k tok) (⚡ 93% Cache)` | `Ctx: 22%` |
+| **`quota_5h`** | 5-Hour Rolling Quota Reserve — Active 5-hour rolling token reserve percentage and countdown reset timer (`↻ 3h 14m`) | `Quota: 53% (↻ 3h 34m)` | `5h: 53%` |
+| **`quota_weekly`** | Weekly Quota Reserve — Weekly secondary quota reserve percentage across Gemini or 3P providers | `Wk: 80%` | `80%` |
+| **`session`** | Session Elapsed Uptime — Color-graded elapsed time since session start with optional seconds display and configurable threshold bands | `⏱️ 1h 24m 15s` | `⏱️ 84m` |
+| **`mcp`** | Registered MCP Servers — Count of connected Model Context Protocol (MCP) tool servers | `🔌 15 MCP` | `🔌 15` |
+| **`tasks`** | Running Background Tasks — Count of active, uncompleted background subshell tasks | `⚙️ 2 tasks` | `⚙️ 2` |
+| **`subagents`** | Active Subagents — Count of running background subagents and specialized workers | `🤖 1 subagent` | `🤖 1` |
+| **`artifacts`** | Generated Artifacts Count — Number of brain markdown artifact documents created in the active session | `📝 7 artifacts` | `📝 7` |
+| **`queue`** | Queued Input Messages — Count of pending user-queued prompt turns waiting for execution | `⏳ 2 queued` | `⏳ 2` |
+| **`sandbox`** | Sandbox Security Mode — Container / command execution sandbox protection indicator | `🛡️ Sandbox` | `🛡️` |
+| **`auth`** | Authentication Provider — Active authentication provider badge (`API-Key`, `OAuth`, `Vertex`) | `🔑 API-Key` | `🔑` |
+| **`fork`** | Milestone Fork Advisory — Context and step-aware recommendation badge advising when to run `/fork <project>` at clean milestone boundaries | `🍴 Milestone: consider /fork (65% • 312s)` | `🍴 /fork` |
+
+<!-- AUTO-DOC:ITEMS_TABLE:END -->
 
 ---
 

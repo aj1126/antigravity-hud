@@ -6,6 +6,49 @@
 
 ---
 
+### [SESSION LOG: 2026-08-21 (Part 17 - Performance Optimization, Memory Tuning & Robustness Hardening)]
+* **Completed Objectives:**
+  - Optimized `getGitDetails` in `bin/hud.js` to execute `git` directly (bypassing `cmd.exe` shell spawn overhead) with 750ms TTL in-memory micro-caching.
+  - Optimized `getTranscriptStepCount` with smart `mtime` + `size` caching and fast byte-level newline counting ($O(1)$ memory lookup, eliminating large JSON array allocations).
+  - Implemented lazy telemetry resolution in the stdio render loop: only evaluates metrics actively placed on enabled display lines (`activeItemSet`).
+  - Added debounced disk write protection in `getQuotaSegments` and `getSessionUptime` to prevent redundant filesystem I/O on NVMe / Dev Drives.
+  - Hardened WinForms configurator (`bin/hud_gui.ps1`) with high-DPI scaling (`PerMonitorV2`) and graceful headless protection.
+  - Implemented Test Suite 8 (`tests/hud_performance.test.js`) verifying stdio latency benchmarks, large transcript cache speed, narrow viewport resilience (35 cols), and heap stability.
+  - Integrated Suite 8 into `tests/run_all_hud_tests.ps1` expanding master test runner to **8 Suites / 56 Assertions Passed (100% Green)**.
+  - Added `test:bench` script to `package.json` and verified zero drift across active runtime targets (`hud diff` / `hud check`).
+
+* **Branch Status Matrix:**
+  - `main` (`5aaeacc`): Production baseline (v2.3.0, self-healing, BOM-free UTF-8).
+  - `feature/bidirectional-runtime-repo-sync`: Performance optimizations, automated documentation engine, presets library, 4-line layout, bidirectional sync engine (Active, 56/56 tests pass, 100% in-sync).
+  - `feature/hud-gui-active-scripts-sync` (`7ac731e`): WinForms GUI active scripts targeting & dual-sync save.
+  - `feature/agy-lifecycle-hooks` (`ace66b4`): Zero-quota lifecycle hooks suite.
+  - `feature/local-ollama-agents` (`d16b48a`): Planned local Ollama offloading for GTX 1660 SUPER.
+
+---
+
+### [SESSION LOG: 2026-08-21 (Part 16 - Automated Documentation Engine & Parity Verification Matrix)]
+* **Completed Objectives:**
+  - Implemented single-source-of-truth automated documentation generation engine in `scripts/generate_docs.js`.
+  - Generated complete, exhaustive markdown documentation catalog in `docs/`:
+    - `docs/ARCHITECTURE.md`: Sub-millisecond stdio pipeline, Mermaid system diagrams, ANSI OSC 0 terminal tab synchronization.
+    - `docs/CLI_REFERENCE.md`: Complete specification of all 20+ CLI subcommands, arguments, aliases, and examples.
+    - `docs/TELEMETRY_ITEMS.md`: Comprehensive 16-metric registry, data paths, multi-tier rendering (`full`, `short`, `minimal`), and color thresholds.
+    - `docs/CONFIGURATION_SCHEMA.md`: Schema specification for `hud_config.json`, options, and presets catalog.
+    - `docs/LIFECYCLE_HOOKS.md`: Architecture guide for zero-quota lifecycle hooks, perma-logging, and Windows 11 notifications.
+  - Injected non-destructive synchronization markers (`<!-- AUTO-DOC:... -->`) into `README.md` and added catalog navigation.
+  - Created Test Suite 7 in `tests/hud_docs.test.js` verifying 0% documentation drift, valid internal links, and complete schema parity.
+  - Integrated Suite 7 into `tests/run_all_hud_tests.ps1` expanding master test suite to **7 Suites / 52 Passed (100% Green)**.
+  - Added `docs` and `docs:check` scripts to `package.json`.
+
+* **Branch Status Matrix:**
+  - `main` (`5aaeacc`): Production baseline (v2.3.0, self-healing, BOM-free UTF-8).
+  - `feature/bidirectional-runtime-repo-sync`: Automated documentation engine, presets library, 4-line layout, bidirectional sync engine (Active, 52/52 tests pass, 100% in-sync).
+  - `feature/hud-gui-active-scripts-sync` (`7ac731e`): WinForms GUI active scripts targeting & dual-sync save.
+  - `feature/agy-lifecycle-hooks` (`ace66b4`): Zero-quota lifecycle hooks suite.
+  - `feature/local-ollama-agents` (`d16b48a`): Planned local Ollama offloading for GTX 1660 SUPER.
+
+---
+
 ### [SESSION LOG: 2026-08-21 (Part 15 - Master Learning Synthesis & Cross-Session Invariant Codification)]
 * **Completed Objectives:**
   - Formally approved and codified 3 new architectural and operational invariants in `~/.gemini/antigravity/knowledge/runtime_drift_and_self_healing_protocol.md`:

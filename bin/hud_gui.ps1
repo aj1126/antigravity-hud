@@ -5,10 +5,21 @@
 # item_styles), non-destructive JSON persistence, fork advisory item,
 # dynamic compact-mode live preview.
 # =====================================================================
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
+try {
+    Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
+    Add-Type -AssemblyName System.Drawing -ErrorAction Stop
+} catch {
+    Write-Error "Windows Forms is not available in the current environment."
+    exit 1
+}
 
-[System.Windows.Forms.Application]::EnableVisualStyles()
+try {
+    [System.Windows.Forms.Application]::SetHighDpiMode([System.Windows.Forms.HighDpiMode]::PerMonitorV2)
+} catch {}
+
+try {
+    [System.Windows.Forms.Application]::EnableVisualStyles()
+} catch {}
 
 $configCandidates = @(
     $env:HUD_CONFIG_PATH,

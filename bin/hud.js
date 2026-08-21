@@ -1667,6 +1667,8 @@ process.stdin.on('data', (chunk) => {
   input += chunk;
 });
 
+const _gitCache = new Map();
+
 function getGitDetails(startDir) {
   let branch = null;
   let dirty = false;
@@ -1677,7 +1679,13 @@ function getGitDetails(startDir) {
   let untracked = 0;
 
   try {
-    let curr = path.resolve(startDir);
+    const resolvedDir = path.resolve(startDir);
+    const cached = _gitCache.get(resolvedDir);
+    if (cached && (Date.now() - cached.timestamp < 750)) {
+      return cached.data;
+    }
+
+    let curr = resolvedDir;
     let gitDir = null;
 
     while (curr) {
@@ -1709,10 +1717,12 @@ function getGitDetails(startDir) {
       }
 
       try {
-        const porcelain = execFileSync('cmd.exe', ['/c', 'git status --porcelain=v1 -unormal 2>nul'], {
+        const porcelain = execFileSync('git', ['status', '--porcelain=v1', '-unormal'], {
           cwd: startDir,
           windowsHide: true,
-          encoding: 'utf8'
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'ignore'],
+          timeout: 1500
         });
         if (porcelain && porcelain.trim()) {
           dirty = true;
@@ -1731,10 +1741,12 @@ function getGitDetails(startDir) {
 
       try {
         if (branch) {
-          const ab = execFileSync('cmd.exe', ['/c', `git rev-list --left-right --count HEAD...@{upstream} 2>nul`], {
+          const ab = execFileSync('git', ['rev-list', '--left-right', '--count', 'HEAD...@{upstream}'], {
             cwd: startDir,
             windowsHide: true,
-            encoding: 'utf8'
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+            timeout: 1500
           }).trim();
           if (ab) {
             const [a, b] = ab.split(/\s+/).map(n => parseInt(n, 10));
@@ -1744,6 +1756,10 @@ function getGitDetails(startDir) {
         }
       } catch (_) {}
     }
+
+    const result = { branch, dirty, ahead, behind, staged, unstaged, untracked };
+    _gitCache.set(resolvedDir, { timestamp: Date.now(), data: result });
+    return result;
   } catch (_) {}
 
   return { branch, dirty, ahead, behind, staged, unstaged, untracked };
@@ -1827,6 +1843,8 @@ function clearForkSnooze() {
   } catch (_) {}
 }
 
+const _stepCountCache = new Map();
+
 function getTranscriptStepCount(payload) {
   if (!payload || typeof payload !== 'object') return 0;
   if (typeof payload.step_count === 'number' && payload.step_count > 0) {
@@ -1848,8 +1866,18 @@ function getTranscriptStepCount(payload) {
   for (const c of candidates) {
     if (c && fs.existsSync(c)) {
       try {
+        const stat = fs.statSync(c);
+        const cached = _stepCountCache.get(c);
+        if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
+          return cached.count;
+        }
         const raw = fs.readFileSync(c, 'utf8');
-        const count = raw.split(/\r?\n/).filter(Boolean).length;
+        let count = 0;
+        for (let i = 0; i < raw.length; i++) {
+          if (raw.charCodeAt(i) === 10) count++;
+        }
+        if (raw.length > 0 && raw.charCodeAt(raw.length - 1) !== 10) count++;
+        _stepCountCache.set(c, { mtimeMs: stat.mtimeMs, size: stat.size, count });
         if (count > 0) return count;
       } catch (_) {}
     }
@@ -2131,13 +2159,29 @@ function getQuotaSegments(payload, style5h = 'full', styleWk = 'full') {
     try {
       const qDir = path.dirname(quotaCacheFile);
       if (!fs.existsSync(qDir)) fs.mkdirSync(qDir, { recursive: true });
-      fs.writeFileSync(quotaCacheFile, JSON.stringify({
-        q5hPercent: q5hPercent !== null ? Math.round(q5hPercent) : null,
-        q5hReset,
-        qWkPercent: qWkPercent !== null ? Math.round(qWkPercent) : null,
-        qWkReset,
-        updatedAt: Date.now()
-      }), 'utf8');
+      const now = Date.now();
+      const rounded5h = q5hPercent !== null ? Math.round(q5hPercent) : null;
+      const roundedWk = qWkPercent !== null ? Math.round(qWkPercent) : null;
+
+      let shouldWrite = true;
+      if (fs.existsSync(quotaCacheFile)) {
+        try {
+          const prev = JSON.parse(fs.readFileSync(quotaCacheFile, 'utf8'));
+          if (prev.q5hPercent === rounded5h && prev.qWkPercent === roundedWk && (now - prev.updatedAt < 30000)) {
+            shouldWrite = false;
+          }
+        } catch (_) {}
+      }
+
+      if (shouldWrite) {
+        fs.writeFileSync(quotaCacheFile, JSON.stringify({
+          q5hPercent: rounded5h,
+          q5hReset,
+          qWkPercent: roundedWk,
+          qWkReset,
+          updatedAt: now
+        }), 'utf8');
+      }
     } catch (_) {}
   } else if (!isTestMode && fs.existsSync(quotaCacheFile)) {
     try {
@@ -2217,12 +2261,15 @@ function getSessionUptime(payload) {
       if (fs.existsSync(stampFile)) {
         const data = JSON.parse(fs.readFileSync(stampFile, 'utf8'));
         if (data.startTime && (Date.now() - data.lastSeen < 24 * 3600 * 1000)) {
-          data.lastSeen = Date.now();
-          fs.writeFileSync(stampFile, JSON.stringify(data), 'utf8');
+          if (Date.now() - (data.lastWritten || 0) > 5000) {
+            data.lastSeen = Date.now();
+            data.lastWritten = Date.now();
+            fs.writeFileSync(stampFile, JSON.stringify(data), 'utf8');
+          }
           return Math.max(0, Math.floor((Date.now() - data.startTime) / 1000));
         }
       }
-      const newRecord = { startTime: Date.now(), lastSeen: Date.now() };
+      const newRecord = { startTime: Date.now(), lastSeen: Date.now(), lastWritten: Date.now() };
       fs.writeFileSync(stampFile, JSON.stringify(newRecord), 'utf8');
     } catch (_) {}
   }
@@ -2244,12 +2291,26 @@ process.stdin.on('end', () => {
     const cfg = loadConfig();
     const sep = `\x1b[90m${cfg.separator}\x1b[0m`;
 
+    const numLines = Math.max(1, Math.min(4, cfg.lines || 2));
+    const linesList = [cfg.line1, cfg.line2, cfg.line3, cfg.line4].slice(0, numLines);
+    const disabledSet = new Set(cfg.disabled || []);
+
+    const activeItemSet = new Set();
+    for (const line of linesList) {
+      if (Array.isArray(line)) {
+        for (const k of line) {
+          if (!disabledSet.has(k)) activeItemSet.add(k);
+        }
+      }
+    }
+
     // 1. Workspace, Project & Git
     const stWs = resolveItemStyle('workspace', cfg, width);
     const cwd = payload.workspace?.current_dir || payload.cwd || process.cwd();
     const wsName = path.basename(cwd) || cwd;
     const projName = getProjectName(cwd, payload);
-    const git = getGitDetails(cwd);
+    const needGit = activeItemSet.has('workspace') || activeItemSet.has('git_status') || activeItemSet.has('fork') || activeItemSet.has('fork_advisory');
+    const git = needGit ? getGitDetails(cwd) : {};
 
     let gitInfo = '';
     if (git.branch) {
@@ -2274,43 +2335,48 @@ process.stdin.on('end', () => {
     const wsSegment = `\x1b[1m\x1b[34m📁 ${displayTarget}\x1b[0m${gitInfo}`;
 
     // 2. Model & Effort
-    const stMdl = resolveItemStyle('model', cfg, width);
-    let modelName = 'Gemini';
-    if (typeof payload.model === 'string') {
-      modelName = payload.model;
-    } else if (payload.model && typeof payload.model === 'object') {
-      modelName = payload.model.display_name || payload.model.id || 'Gemini';
+    let modelSegment = '';
+    if (activeItemSet.has('model')) {
+      const stMdl = resolveItemStyle('model', cfg, width);
+      let modelName = 'Gemini';
+      if (typeof payload.model === 'string') {
+        modelName = payload.model;
+      } else if (payload.model && typeof payload.model === 'object') {
+        modelName = payload.model.display_name || payload.model.id || 'Gemini';
+      }
+      if (stMdl === 'minimal') {
+        if (modelName.toLowerCase().includes('flash')) modelName = 'Flash';
+        else if (modelName.toLowerCase().includes('sonnet')) modelName = 'Sonnet';
+        else if (modelName.toLowerCase().includes('opus')) modelName = 'Opus';
+        else if (modelName.toLowerCase().includes('pro')) modelName = 'Pro';
+        else modelName = modelName.split(' ')[0];
+      } else if (stMdl === 'short') {
+        modelName = modelName.replace(/\(.*?\)/g, '').trim();
+      }
+      const effort = (stMdl === 'full' && payload.model?.effort) ? ` \x1b[90m[🧠 ${payload.model.effort.toUpperCase()}]\x1b[0m` : '';
+      modelSegment = `\x1b[1m\x1b[36m${modelName}\x1b[0m${effort}`;
     }
-    if (stMdl === 'minimal') {
-      if (modelName.toLowerCase().includes('flash')) modelName = 'Flash';
-      else if (modelName.toLowerCase().includes('sonnet')) modelName = 'Sonnet';
-      else if (modelName.toLowerCase().includes('opus')) modelName = 'Opus';
-      else if (modelName.toLowerCase().includes('pro')) modelName = 'Pro';
-      else modelName = modelName.split(' ')[0];
-    } else if (stMdl === 'short') {
-      modelName = modelName.replace(/\(.*?\)/g, '').trim();
-    }
-    const effort = (stMdl === 'full' && payload.model?.effort) ? ` \x1b[90m[🧠 ${payload.model.effort.toUpperCase()}]\x1b[0m` : '';
-    const modelSegment = `\x1b[1m\x1b[36m${modelName}\x1b[0m${effort}`;
 
     // 3. Agent State
-    const stState = resolveItemStyle('state', cfg, width);
-    const rawState = (payload.agent_state || payload.state || 'idle').toUpperCase();
-    let stateColor = '\x1b[36m';
-    if (rawState.includes('WORK')) stateColor = '\x1b[32m';
-    else if (rawState.includes('WAIT')) stateColor = '\x1b[33m';
-    else if (rawState.includes('ERR')) stateColor = '\x1b[31m';
+    let stateSegment = '';
+    if (activeItemSet.has('state')) {
+      const stState = resolveItemStyle('state', cfg, width);
+      const rawState = (payload.agent_state || payload.state || 'idle').toUpperCase();
+      let stateColor = '\x1b[36m';
+      if (rawState.includes('WORK')) stateColor = '\x1b[32m';
+      else if (rawState.includes('WAIT')) stateColor = '\x1b[33m';
+      else if (rawState.includes('ERR')) stateColor = '\x1b[31m';
 
-    let stateSegment = `${stateColor}\x1b[1m[${rawState}]\x1b[0m`;
-    if (stState === 'minimal') {
-      stateSegment = `${stateColor}●\x1b[0m`;
-    } else if (stState === 'short') {
-      const shortCode = rawState.includes('WORK') ? 'WRK' : (rawState.includes('WAIT') ? 'WAIT' : (rawState.includes('IDLE') ? 'IDL' : rawState.slice(0, 4)));
-      stateSegment = `${stateColor}[${shortCode}]\x1b[0m`;
+      stateSegment = `${stateColor}\x1b[1m[${rawState}]\x1b[0m`;
+      if (stState === 'minimal') {
+        stateSegment = `${stateColor}●\x1b[0m`;
+      } else if (stState === 'short') {
+        const shortCode = rawState.includes('WORK') ? 'WRK' : (rawState.includes('WAIT') ? 'WAIT' : (rawState.includes('IDLE') ? 'IDL' : rawState.slice(0, 4)));
+        stateSegment = `${stateColor}[${shortCode}]\x1b[0m`;
+      }
     }
 
     // 4. Context Window & Cache Efficiency
-    const stCtx = resolveItemStyle('context', cfg, width);
     const ctx = payload.context_window || {};
     const totalTokens = ctx.total_input_tokens ?? payload.total_input_tokens ?? 0;
     let ctxPercent = ctx.used_percentage ?? payload.context_percentage ?? 0;
@@ -2320,166 +2386,204 @@ process.stdin.on('end', () => {
       ctxPercent = Math.round(ctxPercent);
     }
 
-    const currentUsage = ctx.current_usage || payload.current_usage || {};
-    const cacheRead = currentUsage.cache_read_input_tokens ?? payload.cache_read_input_tokens ?? 0;
-    let cachePercent = 0;
-    if (totalTokens > 0 && cacheRead > 0) {
-      cachePercent = Math.round((cacheRead / totalTokens) * 100);
-    }
+    let ctxSegment = '';
+    if (activeItemSet.has('context')) {
+      const stCtx = resolveItemStyle('context', cfg, width);
+      const currentUsage = ctx.current_usage || payload.current_usage || {};
+      const cacheRead = currentUsage.cache_read_input_tokens ?? payload.cache_read_input_tokens ?? 0;
+      let cachePercent = 0;
+      if (totalTokens > 0 && cacheRead > 0) {
+        cachePercent = Math.round((cacheRead / totalTokens) * 100);
+      }
 
-    const progressBar = renderProgressBar(ctxPercent, stCtx === 'minimal' ? 4 : (stCtx === 'short' ? 6 : 10));
-    let tokenDisplay = '';
-    if (totalTokens > 0) {
-      tokenDisplay = totalTokens >= 1000 ? `${Math.round(totalTokens / 1000)}k` : `${totalTokens}`;
-      if (stCtx === 'full') tokenDisplay = `${totalTokens.toLocaleString()} tok`;
-    }
-    const cacheDisplay = cachePercent > 0 ? `\x1b[32m(⚡ ${cachePercent}%)\x1b[0m` : '';
+      const progressBar = renderProgressBar(ctxPercent, stCtx === 'minimal' ? 4 : (stCtx === 'short' ? 6 : 10));
+      let tokenDisplay = '';
+      if (totalTokens > 0) {
+        tokenDisplay = totalTokens >= 1000 ? `${Math.round(totalTokens / 1000)}k` : `${totalTokens}`;
+        if (stCtx === 'full') tokenDisplay = `${totalTokens.toLocaleString()} tok`;
+      }
+      const cacheDisplay = cachePercent > 0 ? `\x1b[32m(⚡ ${cachePercent}%)\x1b[0m` : '';
 
-    let ctxSegment = `Ctx: ${progressBar} \x1b[1m${ctxPercent}%\x1b[0m`;
-    if (stCtx === 'minimal') {
-      ctxSegment = `Ctx: \x1b[1m${ctxPercent}%\x1b[0m`;
-    } else if (stCtx === 'short') {
-      if (tokenDisplay) ctxSegment += ` (${tokenDisplay})`;
-      if (cacheDisplay) ctxSegment += ` ${cacheDisplay}`;
-    } else {
-      if (tokenDisplay) ctxSegment += ` (${tokenDisplay})`;
-      if (cacheDisplay) ctxSegment += ` ${cacheDisplay}`;
+      ctxSegment = `Ctx: ${progressBar} \x1b[1m${ctxPercent}%\x1b[0m`;
+      if (stCtx === 'minimal') {
+        ctxSegment = `Ctx: \x1b[1m${ctxPercent}%\x1b[0m`;
+      } else if (stCtx === 'short') {
+        if (tokenDisplay) ctxSegment += ` (${tokenDisplay})`;
+        if (cacheDisplay) ctxSegment += ` ${cacheDisplay}`;
+      } else {
+        if (tokenDisplay) ctxSegment += ` (${tokenDisplay})`;
+        if (cacheDisplay) ctxSegment += ` ${cacheDisplay}`;
+      }
     }
 
     // 5. Dual Quotas (5-Hour Rolling & Weekly)
-    const stQ5h = resolveItemStyle('quota_5h', cfg, width);
-    const stQwk = resolveItemStyle('quota_weekly', cfg, width);
-    const { quota5hSegment, quotaWkSegment } = getQuotaSegments(payload, stQ5h, stQwk);
+    let quota5hSegment = '';
+    let quotaWkSegment = '';
+    if (activeItemSet.has('quota_5h') || activeItemSet.has('quota_weekly') || activeItemSet.has('quota')) {
+      const stQ5h = resolveItemStyle('quota_5h', cfg, width);
+      const stQwk = resolveItemStyle('quota_weekly', cfg, width);
+      const qRes = getQuotaSegments(payload, stQ5h, stQwk);
+      quota5hSegment = qRes.quota5hSegment;
+      quotaWkSegment = qRes.quotaWkSegment;
+    }
 
     // 6. MCP Servers
-    const stMcp = resolveItemStyle('mcp', cfg, width);
-    let mcpCount = 0;
-    if (Array.isArray(payload.mcp_servers)) mcpCount = payload.mcp_servers.length;
-    else if (typeof payload.mcp_server_count === 'number') mcpCount = payload.mcp_server_count;
-    else if (typeof payload.mcp_servers_count === 'number') mcpCount = payload.mcp_servers_count;
-    else if (typeof payload.mcp_count === 'number') mcpCount = payload.mcp_count;
+    let mcpSegment = '';
+    if (activeItemSet.has('mcp')) {
+      const stMcp = resolveItemStyle('mcp', cfg, width);
+      let mcpCount = 0;
+      if (Array.isArray(payload.mcp_servers)) mcpCount = payload.mcp_servers.length;
+      else if (typeof payload.mcp_server_count === 'number') mcpCount = payload.mcp_server_count;
+      else if (typeof payload.mcp_servers_count === 'number') mcpCount = payload.mcp_servers_count;
+      else if (typeof payload.mcp_count === 'number') mcpCount = payload.mcp_count;
 
-    if (mcpCount === 0) {
-      const mcpCfgPath = path.join(homeDir, '.gemini', 'config', 'mcp_config.json');
-      if (fs.existsSync(mcpCfgPath)) {
-        try {
-          const cfg = JSON.parse(fs.readFileSync(mcpCfgPath, 'utf8'));
-          if (cfg.mcpServers) mcpCount = Object.keys(cfg.mcpServers).length;
-        } catch (_) {}
+      if (mcpCount === 0) {
+        const mcpCfgPath = path.join(homeDir, '.gemini', 'config', 'mcp_config.json');
+        if (fs.existsSync(mcpCfgPath)) {
+          try {
+            const cfg2 = JSON.parse(fs.readFileSync(mcpCfgPath, 'utf8'));
+            if (cfg2.mcpServers) mcpCount = Object.keys(cfg2.mcpServers).length;
+          } catch (_) {}
+        }
       }
+      const mcpLabel = stMcp === 'full' ? ` ${mcpCount} MCP` : ` ${mcpCount}`;
+      mcpSegment = mcpCount > 0 ? `\x1b[36m🔌${mcpLabel}\x1b[0m` : '';
     }
-    const mcpLabel = stMcp === 'full' ? ` ${mcpCount} MCP` : ` ${mcpCount}`;
-    const mcpSegment = mcpCount > 0 ? `\x1b[36m🔌${mcpLabel}\x1b[0m` : '';
 
     // 7. Background Tasks & Subagents
-    const stTasks = resolveItemStyle('tasks', cfg, width);
-    let taskCount = 0;
-    if (typeof payload.running_tasks_count === 'number') taskCount = payload.running_tasks_count;
-    else if (typeof payload.background_task_count === 'number') taskCount = payload.background_task_count;
-    else if (Array.isArray(payload.background_tasks)) {
-      taskCount = payload.background_tasks.filter(t => {
-        if (!t) return false;
-        if (typeof t === 'string') return true;
-        const st = (t.state || t.status || '').toLowerCase();
-        return st === 'running' || st === 'active' || st === 'in_progress' || st === 'waiting_for_input';
-      }).length;
-    } else if (Array.isArray(payload.tasks)) {
-      taskCount = payload.tasks.filter(t => {
-        if (!t) return false;
-        if (typeof t === 'string') return true;
-        const st = (t.state || t.status || '').toLowerCase();
-        return st === 'running' || st === 'active' || st === 'in_progress' || st === 'waiting_for_input';
-      }).length;
-    } else if (payload.tasks && typeof payload.tasks.running === 'number') {
-      taskCount = payload.tasks.running;
+    let taskSegment = '';
+    if (activeItemSet.has('tasks')) {
+      const stTasks = resolveItemStyle('tasks', cfg, width);
+      let taskCount = 0;
+      if (typeof payload.running_tasks_count === 'number') taskCount = payload.running_tasks_count;
+      else if (typeof payload.background_task_count === 'number') taskCount = payload.background_task_count;
+      else if (Array.isArray(payload.background_tasks)) {
+        taskCount = payload.background_tasks.filter(t => {
+          if (!t) return false;
+          if (typeof t === 'string') return true;
+          const st = (t.state || t.status || '').toLowerCase();
+          return st === 'running' || st === 'active' || st === 'in_progress' || st === 'waiting_for_input';
+        }).length;
+      } else if (Array.isArray(payload.tasks)) {
+        taskCount = payload.tasks.filter(t => {
+          if (!t) return false;
+          if (typeof t === 'string') return true;
+          const st = (t.state || t.status || '').toLowerCase();
+          return st === 'running' || st === 'active' || st === 'in_progress' || st === 'waiting_for_input';
+        }).length;
+      } else if (payload.tasks && typeof payload.tasks.running === 'number') {
+        taskCount = payload.tasks.running;
+      }
+      const taskLabel = stTasks === 'full' ? ` ${taskCount} task${taskCount > 1 ? 's' : ''}` : ` ${taskCount}`;
+      taskSegment = taskCount > 0 ? `\x1b[33m⚙️${taskLabel}\x1b[0m` : '';
     }
-    const taskLabel = stTasks === 'full' ? ` ${taskCount} task${taskCount > 1 ? 's' : ''}` : ` ${taskCount}`;
-    const taskSegment = taskCount > 0 ? `\x1b[33m⚙️${taskLabel}\x1b[0m` : '';
 
-    const stSub = resolveItemStyle('subagents', cfg, width);
-    let subagentCount = 0;
-    if (typeof payload.running_subagents_count === 'number') subagentCount = payload.running_subagents_count;
-    else if (typeof payload.active_subagents_count === 'number') subagentCount = payload.active_subagents_count;
-    else if (Array.isArray(payload.subagents)) {
-      subagentCount = payload.subagents.filter(s => {
-        if (!s) return false;
-        if (typeof s === 'string') return true;
-        const st = (s.state || s.status || '').toLowerCase();
-        return st === 'running' || st === 'waiting_for_input' || st === 'waiting_for_dependents' || st === 'in_progress';
-      }).length;
-    } else if (payload.subagents && typeof payload.subagents.active === 'number') {
-      subagentCount = payload.subagents.active;
-    } else if (typeof payload.subagent_count === 'number') {
-      subagentCount = payload.subagent_count;
+    let subagentSegment = '';
+    if (activeItemSet.has('subagents')) {
+      const stSub = resolveItemStyle('subagents', cfg, width);
+      let subagentCount = 0;
+      if (typeof payload.running_subagents_count === 'number') subagentCount = payload.running_subagents_count;
+      else if (typeof payload.active_subagents_count === 'number') subagentCount = payload.active_subagents_count;
+      else if (Array.isArray(payload.subagents)) {
+        subagentCount = payload.subagents.filter(s => {
+          if (!s) return false;
+          if (typeof s === 'string') return true;
+          const st = (s.state || s.status || '').toLowerCase();
+          return st === 'running' || st === 'waiting_for_input' || st === 'waiting_for_dependents' || st === 'in_progress';
+        }).length;
+      } else if (payload.subagents && typeof payload.subagents.active === 'number') {
+        subagentCount = payload.subagents.active;
+      } else if (typeof payload.subagent_count === 'number') {
+        subagentCount = payload.subagent_count;
+      }
+      const subLabel = stSub === 'full' ? ` ${subagentCount} subagent${subagentCount > 1 ? 's' : ''}` : ` ${subagentCount}`;
+      subagentSegment = subagentCount > 0 ? `\x1b[36m🤖${subLabel}\x1b[0m` : '';
     }
-    const subLabel = stSub === 'full' ? ` ${subagentCount} subagent${subagentCount > 1 ? 's' : ''}` : ` ${subagentCount}`;
-    const subagentSegment = subagentCount > 0 ? `\x1b[36m🤖${subLabel}\x1b[0m` : '';
 
     // 8. Artifacts & Queued Messages
-    const artCount = payload.artifact_count ?? (Array.isArray(payload.artifacts) ? payload.artifacts.length : 0);
-    const artifacts = artCount > 0 ? `\x1b[33m📝 ${artCount}\x1b[0m` : '';
+    let artifacts = '';
+    if (activeItemSet.has('artifacts')) {
+      const artCount = payload.artifact_count ?? (Array.isArray(payload.artifacts) ? payload.artifacts.length : 0);
+      artifacts = artCount > 0 ? `\x1b[33m📝 ${artCount}\x1b[0m` : '';
+    }
 
-    let queueCount = 0;
-    if (typeof payload.pending_input_count === 'number') queueCount = payload.pending_input_count;
-    else if (typeof payload.queued_messages_count === 'number') queueCount = payload.queued_messages_count;
-    else if (typeof payload.queued_inputs_count === 'number') queueCount = payload.queued_inputs_count;
-    else if (typeof payload.queue_count === 'number') queueCount = payload.queue_count;
-    else if (typeof payload.queue_length === 'number') queueCount = payload.queue_length;
-    else if (Array.isArray(payload.queued_messages)) queueCount = payload.queued_messages.length;
-    else if (Array.isArray(payload.queued_inputs)) queueCount = payload.queued_inputs.length;
-    else if (Array.isArray(payload.pending_inputs)) queueCount = payload.pending_inputs.length;
-    else if (Array.isArray(payload.pending_messages)) queueCount = payload.pending_messages.length;
-    else if (Array.isArray(payload.message_queue)) queueCount = payload.message_queue.length;
+    let queued = '';
+    if (activeItemSet.has('queue')) {
+      let queueCount = 0;
+      if (typeof payload.pending_input_count === 'number') queueCount = payload.pending_input_count;
+      else if (typeof payload.queued_messages_count === 'number') queueCount = payload.queued_messages_count;
+      else if (typeof payload.queued_inputs_count === 'number') queueCount = payload.queued_inputs_count;
+      else if (typeof payload.queue_count === 'number') queueCount = payload.queue_count;
+      else if (typeof payload.queue_length === 'number') queueCount = payload.queue_length;
+      else if (Array.isArray(payload.queued_messages)) queueCount = payload.queued_messages.length;
+      else if (Array.isArray(payload.queued_inputs)) queueCount = payload.queued_inputs.length;
+      else if (Array.isArray(payload.pending_inputs)) queueCount = payload.pending_inputs.length;
+      else if (Array.isArray(payload.pending_messages)) queueCount = payload.pending_messages.length;
+      else if (Array.isArray(payload.message_queue)) queueCount = payload.message_queue.length;
 
-    const queued = queueCount > 0 ? `\x1b[36m⏳ ${queueCount}\x1b[0m` : '';
+      queued = queueCount > 0 ? `\x1b[36m⏳ ${queueCount}\x1b[0m` : '';
+    }
 
     // 9. Session Runtime
-    const stSess = resolveItemStyle('session', cfg, width);
-    const sessionSec = getSessionUptime(payload);
     let sessionSegment = '';
-    if (sessionSec > 0) {
-      const uptimeCfg = cfg.session_uptime || DEFAULT_CONFIG.session_uptime;
-      const showSec = uptimeCfg.show_seconds !== false;
-      const col = getUptimeColor(sessionSec, uptimeCfg.thresholds);
-      sessionSegment = `${col}⏱️ ${formatDuration(sessionSec, showSec, stSess)}\x1b[0m`;
+    if (activeItemSet.has('session')) {
+      const stSess = resolveItemStyle('session', cfg, width);
+      const sessionSec = getSessionUptime(payload);
+      if (sessionSec > 0) {
+        const uptimeCfg = cfg.session_uptime || DEFAULT_CONFIG.session_uptime;
+        const showSec = uptimeCfg.show_seconds !== false;
+        const col = getUptimeColor(sessionSec, uptimeCfg.thresholds);
+        sessionSegment = `${col}⏱️ ${formatDuration(sessionSec, showSec, stSess)}\x1b[0m`;
+      }
     }
 
     // 10. Auth & Sandbox Badges
-    const stAuth = resolveItemStyle('auth', cfg, width);
-    const authBadge = getAuthBadge(payload, stAuth);
-    const authSegment = authBadge ? `\x1b[90m${authBadge}\x1b[0m` : '';
+    let authSegment = '';
+    if (activeItemSet.has('auth')) {
+      const stAuth = resolveItemStyle('auth', cfg, width);
+      const authBadge = getAuthBadge(payload, stAuth);
+      authSegment = authBadge ? `\x1b[90m${authBadge}\x1b[0m` : '';
+    }
 
-    const stSand = resolveItemStyle('sandbox', cfg, width);
-    let sandboxLabel = '🛡️ Sandbox';
-    if (stSand === 'minimal') sandboxLabel = '🛡️';
-    else if (stSand === 'short') sandboxLabel = '🛡️ Sandboxed';
-    const sandboxSegment = (payload.sandbox?.enabled || payload.sandbox_enabled) ? `\x1b[32m${sandboxLabel}\x1b[0m` : '';
+    let sandboxSegment = '';
+    if (activeItemSet.has('sandbox')) {
+      const stSand = resolveItemStyle('sandbox', cfg, width);
+      let sandboxLabel = '🛡️ Sandbox';
+      if (stSand === 'minimal') sandboxLabel = '🛡️';
+      else if (stSand === 'short') sandboxLabel = '🛡️ Sandboxed';
+      sandboxSegment = (payload.sandbox?.enabled || payload.sandbox_enabled) ? `\x1b[32m${sandboxLabel}\x1b[0m` : '';
+    }
 
     // 11. Git Working Directory Clean / Dirty Status
-    const stGit = resolveItemStyle('git_status', cfg, width);
     let gitStatusSegment = '';
-    if (git.branch) {
-      if (!git.dirty) {
-        gitStatusSegment = stGit === 'minimal' ? '\x1b[32m🌿\x1b[0m' : '\x1b[32m🌿 Clean\x1b[0m';
-      } else {
-        let details = [];
-        if (git.staged > 0) details.push(`+${git.staged}`);
-        if (git.unstaged > 0) details.push(`~${git.unstaged}`);
-        if (git.untracked > 0) details.push(`?${git.untracked}`);
-        const detailStr = details.length > 0 ? ` \x1b[90m(${details.join(' ')})\x1b[0m` : '';
-        if (stGit === 'minimal') {
-          gitStatusSegment = '\x1b[33m⚠️\x1b[0m';
-        } else if (stGit === 'short') {
-          gitStatusSegment = `\x1b[33m⚠️\x1b[0m${detailStr}`;
+    if (activeItemSet.has('git_status')) {
+      const stGit = resolveItemStyle('git_status', cfg, width);
+      if (git.branch) {
+        if (!git.dirty) {
+          gitStatusSegment = stGit === 'minimal' ? '\x1b[32m🌿\x1b[0m' : '\x1b[32m🌿 Clean\x1b[0m';
         } else {
-          gitStatusSegment = `\x1b[33m⚠️ Dirty\x1b[0m${detailStr}`;
+          let details = [];
+          if (git.staged > 0) details.push(`+${git.staged}`);
+          if (git.unstaged > 0) details.push(`~${git.unstaged}`);
+          if (git.untracked > 0) details.push(`?${git.untracked}`);
+          const detailStr = details.length > 0 ? ` \x1b[90m(${details.join(' ')})\x1b[0m` : '';
+          if (stGit === 'minimal') {
+            gitStatusSegment = '\x1b[33m⚠️\x1b[0m';
+          } else if (stGit === 'short') {
+            gitStatusSegment = `\x1b[33m⚠️\x1b[0m${detailStr}`;
+          } else {
+            gitStatusSegment = `\x1b[33m⚠️ Dirty\x1b[0m${detailStr}`;
+          }
         }
       }
     }
 
     // 12. Fork Advisory Badge
-    const stFork = resolveItemStyle('fork', cfg, width);
-    const forkSegment = getForkAdvisory(payload, ctxPercent, cfg, git, stFork);
+    let forkSegment = '';
+    if (activeItemSet.has('fork') || activeItemSet.has('fork_advisory')) {
+      const stFork = resolveItemStyle('fork', cfg, width);
+      forkSegment = getForkAdvisory(payload, ctxPercent, cfg, git, stFork);
+    }
 
     // Item Map
     const itemMap = {
@@ -2503,8 +2607,6 @@ process.stdin.on('end', () => {
       queue: queued
     };
 
-    const disabledSet = new Set(cfg.disabled || []);
-
     function renderLine(keys) {
       return (keys || [])
         .filter(k => !disabledSet.has(k))
@@ -2513,8 +2615,6 @@ process.stdin.on('end', () => {
         .join(` ${sep} `);
     }
 
-    const numLines = Math.max(1, Math.min(4, cfg.lines || 2));
-    const linesList = [cfg.line1, cfg.line2, cfg.line3, cfg.line4].slice(0, numLines);
     const renderedLines = linesList.map(keys => renderLine(keys)).filter(Boolean);
     const output = renderedLines.join('\n');
 
