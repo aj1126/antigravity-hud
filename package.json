@@ -10,7 +10,13 @@
   },
   "scripts": {
     "start": "node bin/hud.js",
-    "gui": "node bin/hud.js gui"
+    "gui": "node bin/hud.js gui",
+    "diff": "node bin/hud.js diff",
+    "backup": "node bin/hud.js backup",
+    "deploy": "node bin/hud.js deploy",
+    "check": "node bin/hud.js check",
+    "repair": "node bin/hud.js repair",
+    "test": "pwsh -File tests/run_all_hud_tests.ps1"
   },
   "repository": {
     "type": "git",

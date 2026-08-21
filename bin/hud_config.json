@@ -5,20 +5,20 @@
   "compact_mode": "auto",
   "line1": [
     "workspace",
-    "git_status",
     "model",
-    "state"
+    "state",
+    "fork"
   ],
   "line2": [
     "context",
-    "fork",
     "quota_5h",
-    "quota_weekly"
-  ],
-  "line3": [
-    "mcp",
+    "quota_weekly",
     "tasks",
     "artifacts",
+    "mcp",
+    "git_status"
+  ],
+  "line3": [
     "queue",
     "sandbox",
     "auth"

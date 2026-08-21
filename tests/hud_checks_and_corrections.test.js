@@ -19,10 +19,14 @@ const fixtureCfgPath = path.join(__dirname, 'fixtures', 'sample_full_hud_config.
 const sandboxRoot = path.join(os.tmpdir(), 'hud_check_repair_test_sandbox_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7));
 const mockScriptsDir = path.join(sandboxRoot, 'scripts');
 const mockHudDir = path.join(sandboxRoot, 'hud');
+const mockRepoDir = path.join(sandboxRoot, 'repo');
 const mockSettingsPath = path.join(sandboxRoot, 'settings.json');
 
 fs.mkdirSync(mockScriptsDir, { recursive: true });
 fs.mkdirSync(mockHudDir, { recursive: true });
+fs.mkdirSync(path.join(mockRepoDir, 'bin'), { recursive: true });
+fs.mkdirSync(path.join(mockRepoDir, 'web'), { recursive: true });
+fs.mkdirSync(path.join(mockRepoDir, 'hooks'), { recursive: true });
 
 // Seed initial canonical copies into sandbox
 function resolveCanonical(fname, repoSubdir) {
@@ -40,14 +44,40 @@ const canonicalFiles = {
   'hud.js': resolveCanonical('hud.js', 'bin'),
   'hud_gui.ps1': resolveCanonical('hud_gui.ps1', 'bin'),
   'hud_gui.html': resolveCanonical('hud_gui.html', 'web'),
-  'hud_config.json': fixtureCfgPath
+  'hud_config.json': fixtureCfgPath,
+  'Sync-AgyHud.ps1': resolveCanonical('Sync-AgyHud.ps1', '')
 };
 
 function seedSandbox() {
   for (const [fname, src] of Object.entries(canonicalFiles)) {
-    if (fs.existsSync(src)) {
+    if (src && fs.existsSync(src)) {
       fs.copyFileSync(src, path.join(mockScriptsDir, fname));
       fs.copyFileSync(src, path.join(mockHudDir, fname));
+
+      if (fname === 'hud_gui.html') {
+        fs.copyFileSync(src, path.join(mockRepoDir, 'web', fname));
+      } else if (fname === 'Sync-AgyHud.ps1') {
+        fs.copyFileSync(src, path.join(mockRepoDir, fname));
+      } else {
+        fs.copyFileSync(src, path.join(mockRepoDir, 'bin', fname));
+      }
+    }
+  }
+
+  // Seed hooks
+  const repoHooksDir = path.join(__dirname, '..', 'hooks');
+  if (fs.existsSync(repoHooksDir)) {
+    const hookFiles = fs.readdirSync(repoHooksDir);
+    for (const hf of hookFiles) {
+      const srcHook = path.join(repoHooksDir, hf);
+      if (fs.statSync(srcHook).isFile()) {
+        fs.mkdirSync(path.join(mockScriptsDir, 'hooks'), { recursive: true });
+        fs.mkdirSync(path.join(mockHudDir, 'hooks'), { recursive: true });
+        fs.mkdirSync(path.join(mockRepoDir, 'hooks'), { recursive: true });
+        fs.copyFileSync(srcHook, path.join(mockScriptsDir, 'hooks', hf));
+        fs.copyFileSync(srcHook, path.join(mockHudDir, 'hooks', hf));
+        fs.copyFileSync(srcHook, path.join(mockRepoDir, 'hooks', hf));
+      }
     }
   }
 
@@ -68,7 +98,8 @@ const testEnv = {
   HUD_TEST_MODE: '1',
   HUD_TEST_SCRIPTS_DIR: mockScriptsDir,
   HUD_TEST_HUD_DIR: mockHudDir,
-  HUD_TEST_SETTINGS_PATH: mockSettingsPath
+  HUD_TEST_SETTINGS_PATH: mockSettingsPath,
+  HUD_TEST_REPO_DIR: mockRepoDir
 };
 
 let passed = 0;
@@ -245,6 +276,91 @@ runTest('TC-COR-04: Auto-repair fixes broken statusline settings hook', () => {
   const repairedSettings = JSON.parse(fs.readFileSync(mockSettingsPath, 'utf8'));
   assert.strictEqual(repairedSettings.statusLine.enabled, true);
   assert(repairedSettings.statusLine.command.includes('hud.js'));
+});
+
+// 11. TC-DIF-01: hud diff reports identical when sandbox active matches repo
+runTest('TC-DIF-01: hud diff reports identical when sandbox active matches repo', () => {
+  seedSandbox();
+  const diffRes = spawnSync('node', [hudScriptPath, 'diff', '--json'], { env: testEnv, encoding: 'utf8' });
+  assert.strictEqual(diffRes.status, 0);
+  const parsed = JSON.parse(diffRes.stdout);
+  assert.strictEqual(parsed.inSync, true);
+  assert(parsed.items.length > 0);
+});
+
+// 12. TC-DIF-02: hud diff accurately detects modified active files
+runTest('TC-DIF-02: hud diff accurately detects modified active files', () => {
+  seedSandbox();
+  const activeScript = path.join(mockScriptsDir, 'hud.js');
+  fs.appendFileSync(activeScript, '\n// Modified in active runtime\n');
+
+  const diffRes = spawnSync('node', [hudScriptPath, 'diff', '--json'], { env: testEnv, encoding: 'utf8' });
+  assert.strictEqual(diffRes.status, 1);
+  const parsed = JSON.parse(diffRes.stdout);
+  assert.strictEqual(parsed.inSync, false);
+  const hudItem = parsed.items.find(i => i.relActive === 'hud.js');
+  assert(hudItem);
+  assert.strictEqual(hudItem.status, 'ACTIVE_NEWER');
+});
+
+// 13. TC-BCK-01: hud backup synchronizes active runtime edits back into repo
+runTest('TC-BCK-01: hud backup synchronizes active runtime edits back into repo', () => {
+  seedSandbox();
+  const activeScript = path.join(mockScriptsDir, 'hud.js');
+  fs.appendFileSync(activeScript, '\n// Backup Test Marker\n');
+
+  const backupRes = spawnSync('node', [hudScriptPath, 'backup', '--json'], { env: testEnv, encoding: 'utf8' });
+  assert.strictEqual(backupRes.status, 0);
+  const parsed = JSON.parse(backupRes.stdout);
+  assert.strictEqual(parsed.success, true);
+  assert(parsed.backedUp.some(b => b.file.includes('hud.js')));
+
+  const repoScript = path.join(mockRepoDir, 'bin', 'hud.js');
+  const repoContent = fs.readFileSync(repoScript, 'utf8');
+  assert(repoContent.includes('Backup Test Marker'), 'Repo file must contain backed up changes');
+});
+
+// 14. TC-BCK-02: hud backup conflict protection prevents overwriting newer repo files without --force
+runTest('TC-BCK-02: hud backup conflict protection prevents overwriting newer repo files without --force', () => {
+  seedSandbox();
+  const activeScript = path.join(mockScriptsDir, 'hud.js');
+  const repoScript = path.join(mockRepoDir, 'bin', 'hud.js');
+
+  // Set active file mtime to 1 hour ago
+  const pastTime = new Date(Date.now() - 3600000);
+  fs.appendFileSync(activeScript, '\n// Active Older Change\n');
+  fs.utimesSync(activeScript, pastTime, pastTime);
+
+  // Set repo file mtime to now
+  fs.appendFileSync(repoScript, '\n// Repo Newer Change\n');
+  const now = new Date();
+  fs.utimesSync(repoScript, now, now);
+
+  const backupRes = spawnSync('node', [hudScriptPath, 'backup', '--json'], { env: testEnv, encoding: 'utf8' });
+  assert.strictEqual(backupRes.status, 1);
+  const parsed = JSON.parse(backupRes.stdout);
+  assert.strictEqual(parsed.success, false);
+  assert(parsed.conflicts.length > 0, 'Conflict must be reported');
+
+  // Overwrite with --force
+  const forceRes = spawnSync('node', [hudScriptPath, 'backup', '--json', '--force'], { env: testEnv, encoding: 'utf8' });
+  assert.strictEqual(forceRes.status, 0);
+});
+
+// 15. TC-DEP-01: hud deploy synchronizes repo files to active runtime directories
+runTest('TC-DEP-01: hud deploy synchronizes repo files to active runtime directories', () => {
+  seedSandbox();
+  const repoHtml = path.join(mockRepoDir, 'web', 'hud_gui.html');
+  fs.appendFileSync(repoHtml, '\n<!-- Deployed from Repo -->\n');
+
+  const deployRes = spawnSync('node', [hudScriptPath, 'deploy', '--json'], { env: testEnv, encoding: 'utf8' });
+  assert.strictEqual(deployRes.status, 0);
+  const parsed = JSON.parse(deployRes.stdout);
+  assert.strictEqual(parsed.success, true);
+
+  const activeHtml = path.join(mockScriptsDir, 'hud_gui.html');
+  const activeContent = fs.readFileSync(activeHtml, 'utf8');
+  assert(activeContent.includes('Deployed from Repo'), 'Active runtime must receive deployed updates');
 });
 
 // Teardown Sandbox

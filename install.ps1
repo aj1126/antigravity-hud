@@ -32,11 +32,17 @@ Write-Host "[1/3] Deploying HUD engine, WinForms configurator & Web GUI..." -For
 Copy-Item (Join-Path $RepoRoot "bin\hud.js") (Join-Path $ScriptsDir "hud.js") -Force
 Copy-Item (Join-Path $RepoRoot "bin\hud_gui.ps1") (Join-Path $ScriptsDir "hud_gui.ps1") -Force
 Copy-Item (Join-Path $RepoRoot "web\hud_gui.html") (Join-Path $ScriptsDir "hud_gui.html") -Force
+Copy-Item (Join-Path $RepoRoot "Sync-AgyHud.ps1") (Join-Path $ScriptsDir "Sync-AgyHud.ps1") -Force
+
+$ScriptsConfigDest = Join-Path $ScriptsDir "hud_config.json"
+if (-not (Test-Path $ScriptsConfigDest)) {
+    Copy-Item (Join-Path $RepoRoot "bin\hud_config.json") $ScriptsConfigDest -Force
+}
 
 $ScriptsHooksDir = Join-Path $ScriptsDir "hooks"
 if (-not (Test-Path $ScriptsHooksDir)) { New-Item -ItemType Directory -Path $ScriptsHooksDir -Force | Out-Null }
 Copy-Item (Join-Path $RepoRoot "hooks\*") $ScriptsHooksDir -Recurse -Force
-Write-Host "  [OK] Deployed runtime scripts and hooks to $ScriptsDir" -ForegroundColor Green
+Write-Host "  [OK] Deployed runtime scripts, hooks, and Sync-AgyHud to $ScriptsDir" -ForegroundColor Green
 
 # Copy to dedicated ~/.gemini/hud/
 Copy-Item (Join-Path $RepoRoot "bin\hud.js") (Join-Path $HudDir "hud.js") -Force

@@ -6,6 +6,28 @@
 
 ---
 
+### [SESSION LOG: 2026-08-21 (Part 12 - Active Runtime & GitHub Repo Bidirectional Unification Implementation)]
+* **Completed Objectives:**
+  - Archived complete pre-unification state to `scratch/backup_pre_unification/`.
+  - Implemented **Bidirectional Synchronization & Backup Engine**:
+    1. `getRepoPath()`: 4-tier discovery (`ANTIGRAVITY_HUD_REPO` -> `cfg.repo_path` -> `B:\Repos\antigravity-hud` -> `.git` walk).
+    2. `hud diff`: Visual comparison matrix between active runtime and GitHub repo.
+    3. `hud backup`: Synchronizes active runtime improvements back into GitHub repo with timestamp conflict protection.
+    4. `hud deploy`: Deploys canonical repository updates to active runtime directories.
+  - Upgraded `Sync-AgyHud.ps1` with `-Backup`, `-Deploy`, `-Diff`, `-Watch` (debounced continuous file watcher), and `-Commit` support.
+  - Deployed `Sync-AgyHud.ps1` to `~/.gemini/scripts/Sync-AgyHud.ps1`.
+  - Expanded test suite to **6 suites / 43 assertions passed (100% pass rate)** including `TC-DIF-01`, `TC-DIF-02`, `TC-BCK-01`, `TC-BCK-02`, and `TC-DEP-01`.
+  - Verified 100% in-sync status across all 9 tracked components.
+
+* **Branch Status Matrix:**
+  - `main` (`5aaeacc`): Production baseline (v2.3.0, self-healing, BOM-free UTF-8).
+  - `feature/bidirectional-runtime-repo-sync`: Active Runtime & GitHub Repo bidirectional sync engine (Active, 43/43 tests pass).
+  - `feature/hud-gui-active-scripts-sync` (`7ac731e`): WinForms GUI active scripts targeting & dual-sync save.
+  - `feature/agy-lifecycle-hooks` (`ace66b4`): Zero-quota lifecycle hooks suite (6 suites / 38 assertions passing).
+  - `feature/local-ollama-agents` (`d16b48a`): Planned local Ollama offloading for GTX 1660 SUPER.
+
+---
+
 ### [SESSION LOG: 2026-08-21 (Part 11 - Deep-Scan Codebase Audit & Complete Health Target Parity Codification)]
 * **Completed Objectives:**
   - Performed deep-scan audit across all repository files (`bin/`, `hooks/`, `web/`, `tests/`) and active deployment targets.

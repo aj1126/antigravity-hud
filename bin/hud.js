@@ -285,8 +285,271 @@ function stripBomFromFile(filePath) {
   return false;
 }
 
+function getRepoPath() {
+  if (process.env.HUD_TEST_REPO_DIR && fs.existsSync(process.env.HUD_TEST_REPO_DIR)) {
+    return process.env.HUD_TEST_REPO_DIR;
+  }
+  if (process.env.ANTIGRAVITY_HUD_REPO && fs.existsSync(process.env.ANTIGRAVITY_HUD_REPO)) {
+    return process.env.ANTIGRAVITY_HUD_REPO;
+  }
+  try {
+    const cfg = loadConfig();
+    if (cfg.repo_path && fs.existsSync(cfg.repo_path)) {
+      return cfg.repo_path;
+    }
+  } catch (_) {}
+
+  const defaultPath = path.join('B:', 'Repos', 'antigravity-hud');
+  if (fs.existsSync(defaultPath)) {
+    return defaultPath;
+  }
+
+  // Walk up from __dirname
+  let curr = __dirname;
+  for (let i = 0; i < 5; i++) {
+    if (fs.existsSync(path.join(curr, '.git')) && fs.existsSync(path.join(curr, 'package.json'))) {
+      return curr;
+    }
+    const parent = path.dirname(curr);
+    if (parent === curr) break;
+    curr = parent;
+  }
+
+  return defaultPath;
+}
+
+function getBidirectionalMapping(repoRoot, scriptsDir) {
+  return [
+    { relRepo: path.join('bin', 'hud.js'), relActive: 'hud.js', type: 'code' },
+    { relRepo: path.join('bin', 'hud_gui.ps1'), relActive: 'hud_gui.ps1', type: 'code' },
+    { relRepo: path.join('bin', 'hud_config.json'), relActive: 'hud_config.json', type: 'config' },
+    { relRepo: path.join('web', 'hud_gui.html'), relActive: 'hud_gui.html', type: 'code' },
+    { relRepo: 'Sync-AgyHud.ps1', relActive: 'Sync-AgyHud.ps1', type: 'code' },
+    { relRepo: path.join('hooks', 'post_tool_format.js'), relActive: path.join('hooks', 'post_tool_format.js'), type: 'hook' },
+    { relRepo: path.join('hooks', 'on_session_start.ps1'), relActive: path.join('hooks', 'on_session_start.ps1'), type: 'hook' },
+    { relRepo: path.join('hooks', 'pre_tool_guard.js'), relActive: path.join('hooks', 'pre_tool_guard.js'), type: 'hook' },
+    { relRepo: path.join('hooks', 'on_session_exit.ps1'), relActive: path.join('hooks', 'on_session_exit.ps1'), type: 'hook' }
+  ].map(m => ({
+    ...m,
+    repoPath: path.join(repoRoot, m.relRepo),
+    activePath: path.join(scriptsDir, m.relActive)
+  }));
+}
+
+function performDiff(customRepoRoot = null) {
+  const repoRoot = customRepoRoot || getRepoPath();
+  const scriptsDir = process.env.HUD_TEST_SCRIPTS_DIR || path.join(homeDir, '.gemini', 'scripts');
+  const mappings = getBidirectionalMapping(repoRoot, scriptsDir);
+
+  const diffReport = {
+    repoRoot,
+    scriptsDir,
+    checkedAt: new Date().toISOString(),
+    inSync: true,
+    items: []
+  };
+
+  for (const m of mappings) {
+    const activeExists = fs.existsSync(m.activePath);
+    const repoExists = fs.existsSync(m.repoPath);
+    const activeHash = activeExists ? getFileSha256(m.activePath) : null;
+    const repoHash = repoExists ? getFileSha256(m.repoPath) : null;
+    const activeStat = activeExists ? fs.statSync(m.activePath) : null;
+    const repoStat = repoExists ? fs.statSync(m.repoPath) : null;
+
+    let status = 'IDENTICAL';
+    if (!activeExists && !repoExists) {
+      status = 'MISSING_BOTH';
+      diffReport.inSync = false;
+    } else if (!activeExists) {
+      status = 'REPO_ONLY';
+      diffReport.inSync = false;
+    } else if (!repoExists) {
+      status = 'ACTIVE_ONLY';
+      diffReport.inSync = false;
+    } else if (activeHash !== repoHash) {
+      diffReport.inSync = false;
+      if (activeStat && repoStat) {
+        if (activeStat.mtimeMs > repoStat.mtimeMs) {
+          status = 'ACTIVE_NEWER';
+        } else if (repoStat.mtimeMs > activeStat.mtimeMs) {
+          status = 'REPO_NEWER';
+        } else {
+          status = 'MODIFIED_SAME_TIME';
+        }
+      } else {
+        status = 'MODIFIED';
+      }
+    }
+
+    diffReport.items.push({
+      relActive: m.relActive,
+      relRepo: m.relRepo,
+      activePath: m.activePath,
+      repoPath: m.repoPath,
+      type: m.type,
+      activeExists,
+      repoExists,
+      activeHash,
+      repoHash,
+      activeMtime: activeStat ? activeStat.mtime.toISOString() : null,
+      repoMtime: repoStat ? repoStat.mtime.toISOString() : null,
+      status
+    });
+  }
+
+  return diffReport;
+}
+
+function performBackup(options = {}) {
+  const force = !!options.force;
+  const repoRoot = options.repoRoot || getRepoPath();
+  const scriptsDir = process.env.HUD_TEST_SCRIPTS_DIR || path.join(homeDir, '.gemini', 'scripts');
+  const mappings = getBidirectionalMapping(repoRoot, scriptsDir);
+
+  const report = {
+    success: true,
+    repoRoot,
+    scriptsDir,
+    backedUp: [],
+    skipped: [],
+    conflicts: [],
+    errors: []
+  };
+
+  for (const m of mappings) {
+    if (!fs.existsSync(m.activePath)) {
+      report.skipped.push({ file: m.relActive, reason: 'Active file does not exist' });
+      continue;
+    }
+
+    const activeHash = getFileSha256(m.activePath);
+    const repoExists = fs.existsSync(m.repoPath);
+    const repoHash = repoExists ? getFileSha256(m.repoPath) : null;
+
+    if (repoExists && activeHash === repoHash) {
+      report.skipped.push({ file: m.relActive, reason: 'Identical hash' });
+      continue;
+    }
+
+    if (repoExists && !force) {
+      const activeStat = fs.statSync(m.activePath);
+      const repoStat = fs.statSync(m.repoPath);
+      if (repoStat.mtimeMs > activeStat.mtimeMs + 2000) {
+        report.conflicts.push({
+          file: m.relActive,
+          repoPath: m.repoPath,
+          repoMtime: repoStat.mtime.toISOString(),
+          activeMtime: activeStat.mtime.toISOString(),
+          details: 'Repo file is newer than active file. Use --force to overwrite.'
+        });
+        report.success = false;
+        continue;
+      }
+    }
+
+    try {
+      const targetDir = path.dirname(m.repoPath);
+      if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+
+      if (m.type === 'config' && repoExists) {
+        const activeRaw = fs.readFileSync(m.activePath, 'utf8');
+        const activeParsed = JSON.parse(activeRaw);
+        const repoRaw = fs.readFileSync(m.repoPath, 'utf8');
+        const repoParsed = JSON.parse(repoRaw);
+        const merged = { ...repoParsed, ...activeParsed };
+        fs.writeFileSync(m.repoPath, JSON.stringify(merged, null, 2), 'utf8');
+      } else {
+        fs.copyFileSync(m.activePath, m.repoPath);
+      }
+
+      if (hasUtf8Bom(m.repoPath)) {
+        stripBomFromFile(m.repoPath);
+      }
+
+      report.backedUp.push({
+        active: m.activePath,
+        repo: m.repoPath,
+        file: m.relRepo
+      });
+    } catch (err) {
+      report.errors.push({ file: m.relActive, error: err.message });
+      report.success = false;
+    }
+  }
+
+  return report;
+}
+
+function performDeploy(options = {}) {
+  const force = !!options.force;
+  const repoRoot = options.repoRoot || getRepoPath();
+  const scriptsDir = process.env.HUD_TEST_SCRIPTS_DIR || path.join(homeDir, '.gemini', 'scripts');
+  const hudDir = process.env.HUD_TEST_HUD_DIR || path.join(homeDir, '.gemini', 'hud');
+  const mappings = getBidirectionalMapping(repoRoot, scriptsDir);
+
+  const report = {
+    success: true,
+    repoRoot,
+    deployed: [],
+    skipped: [],
+    conflicts: [],
+    errors: []
+  };
+
+  for (const m of mappings) {
+    if (!fs.existsSync(m.repoPath)) {
+      report.skipped.push({ file: m.relRepo, reason: 'Repo source file does not exist' });
+      continue;
+    }
+
+    const repoHash = getFileSha256(m.repoPath);
+    const destTargets = [m.activePath, path.join(hudDir, m.relActive)];
+
+    for (const dest of destTargets) {
+      const destExists = fs.existsSync(dest);
+      const destHash = destExists ? getFileSha256(dest) : null;
+
+      if (destExists && repoHash === destHash) {
+        continue;
+      }
+
+      if (destExists && !force) {
+        const repoStat = fs.statSync(m.repoPath);
+        const destStat = fs.statSync(dest);
+        if (destStat.mtimeMs > repoStat.mtimeMs + 2000) {
+          report.conflicts.push({
+            file: m.relRepo,
+            dest,
+            destMtime: destStat.mtime.toISOString(),
+            repoMtime: repoStat.mtime.toISOString(),
+            details: 'Active file is newer than repo file. Use --force to overwrite.'
+          });
+          report.success = false;
+          continue;
+        }
+      }
+
+      try {
+        const destDir = path.dirname(dest);
+        if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
+        fs.copyFileSync(m.repoPath, dest);
+        if (hasUtf8Bom(dest)) stripBomFromFile(dest);
+        report.deployed.push({ src: m.repoPath, dest });
+      } catch (err) {
+        report.errors.push({ file: m.relRepo, dest, error: err.message });
+        report.success = false;
+      }
+    }
+  }
+
+  performHealthCheck(true);
+
+  return report;
+}
+
 function getCanonicalFileMap() {
-  const repoRoot = path.join(__dirname, '..');
+  const repoRoot = getRepoPath();
   const candidateHudJs = [
     path.join(repoRoot, 'bin', 'hud.js'),
     path.join(__dirname, 'hud.js'),
@@ -313,7 +576,7 @@ function getCanonicalFileMap() {
     path.join(repoRoot, 'bin', 'hud_config.json'),
     path.join(__dirname, 'hud_config.json'),
     path.join(homeDir, '.gemini', 'hud', 'hud_config.json'),
-    path.join(homeDir, '.gemini', 'hud_config.json')
+    path.join(homeDir, '.gemini', 'scripts', 'hud_config.json')
   ].find(p => fs.existsSync(p));
 
   return {
@@ -526,6 +789,104 @@ if (args.length > 0) {
   const rawCmd = args[0].toLowerCase();
   const cmd = rawCmd.replace(/^--?/, '');
   const cfg = loadConfig();
+
+  if (cmd === 'diff' || cmd === 'status-diff' || cmd === 'repo-diff') {
+    const isJson = args.includes('--json') || args.includes('-j');
+    const diffReport = performDiff();
+
+    if (isJson) {
+      console.log(JSON.stringify(diffReport, null, 2));
+      process.exit(diffReport.inSync ? 0 : 1);
+    }
+
+    console.log('\x1b[1m\x1b[36m=== Antigravity HUD: Active vs Repo Diff Matrix ===\x1b[0m\n');
+    console.log(`Repo Root:   \x1b[33m${diffReport.repoRoot}\x1b[0m`);
+    console.log(`Active Root: \x1b[33m${diffReport.scriptsDir}\x1b[0m`);
+    console.log(`Checked At:  \x1b[90m${diffReport.checkedAt}\x1b[0m`);
+    console.log(`Status:      ${diffReport.inSync ? '\x1b[32m✔ 100% IN SYNC\x1b[0m' : '\x1b[33m⚠️ DIVERGENCE DETECTED\x1b[0m'}\n`);
+
+    console.log('\x1b[1mFile Status Table:\x1b[0m');
+    for (const item of diffReport.items) {
+      let statusLabel = '\x1b[32m[IDENTICAL]\x1b[0m';
+      if (item.status === 'ACTIVE_NEWER') statusLabel = '\x1b[33m[ACTIVE NEWER]\x1b[0m';
+      else if (item.status === 'REPO_NEWER') statusLabel = '\x1b[35m[REPO NEWER]\x1b[0m';
+      else if (item.status === 'ACTIVE_ONLY') statusLabel = '\x1b[36m[ACTIVE ONLY]\x1b[0m';
+      else if (item.status === 'REPO_ONLY') statusLabel = '\x1b[31m[REPO ONLY]\x1b[0m';
+      else if (item.status === 'MODIFIED') statusLabel = '\x1b[33m[MODIFIED]\x1b[0m';
+
+      console.log(`  • ${item.relActive.padEnd(28)} -> ${item.relRepo.padEnd(30)} ${statusLabel}`);
+    }
+
+    if (!diffReport.inSync) {
+      console.log('\n\x1b[90mTip: Run `hud backup` to copy active changes -> repo, or `hud deploy` to copy repo -> active.\x1b[0m');
+    }
+
+    process.exit(diffReport.inSync ? 0 : 1);
+  }
+
+  if (cmd === 'backup' || cmd === 'backup-repo' || cmd === 'push-repo' || cmd === 'sync-repo') {
+    const isJson = args.includes('--json') || args.includes('-j');
+    const force = args.includes('--force') || args.includes('-f');
+    const report = performBackup({ force });
+
+    if (isJson) {
+      console.log(JSON.stringify(report, null, 2));
+      process.exit(report.success ? 0 : 1);
+    }
+
+    console.log('\x1b[1m\x1b[36m=== Antigravity HUD: Active -> Repo Backup ===\x1b[0m\n');
+    console.log(`Target Repo: \x1b[33m${report.repoRoot}\x1b[0m`);
+    console.log(`Active Dir:  \x1b[33m${report.scriptsDir}\x1b[0m\n`);
+
+    if (report.backedUp.length > 0) {
+      console.log(`\x1b[32m✔ Backed up ${report.backedUp.length} file(s) to repository:\x1b[0m`);
+      report.backedUp.forEach(b => console.log(`  • ${b.file}`));
+    } else if (report.conflicts.length === 0 && report.errors.length === 0) {
+      console.log('\x1b[32m✔ Repository is already up to date with active runtime.\x1b[0m');
+    }
+
+    if (report.conflicts.length > 0) {
+      console.log('\n\x1b[31m⚠️ Conflicts Detected (Repo has newer edits):\x1b[0m');
+      report.conflicts.forEach(c => console.log(`  ✖ ${c.file}: ${c.details}`));
+      console.log('\x1b[90mUse `hud backup --force` to overwrite repository files.\x1b[0m');
+    }
+
+    if (report.errors.length > 0) {
+      console.log('\n\x1b[31mErrors encountered:\x1b[0m');
+      report.errors.forEach(e => console.log(`  ✖ ${e.file}: ${e.error}`));
+    }
+
+    process.exit(report.success ? 0 : 1);
+  }
+
+  if (cmd === 'deploy' || cmd === 'deploy-active' || cmd === 'pull-repo' || cmd === 'sync-active') {
+    const isJson = args.includes('--json') || args.includes('-j');
+    const force = args.includes('--force') || args.includes('-f');
+    const report = performDeploy({ force });
+
+    if (isJson) {
+      console.log(JSON.stringify(report, null, 2));
+      process.exit(report.success ? 0 : 1);
+    }
+
+    console.log('\x1b[1m\x1b[36m=== Antigravity HUD: Repo -> Active Runtime Deploy ===\x1b[0m\n');
+    console.log(`Source Repo: \x1b[33m${report.repoRoot}\x1b[0m\n`);
+
+    if (report.deployed.length > 0) {
+      console.log(`\x1b[32m✔ Deployed ${report.deployed.length} component(s) to active directories:\x1b[0m`);
+      report.deployed.forEach(d => console.log(`  • ${d.dest}`));
+    } else if (report.conflicts.length === 0 && report.errors.length === 0) {
+      console.log('\x1b[32m✔ Active runtime directories are already in sync with repository.\x1b[0m');
+    }
+
+    if (report.conflicts.length > 0) {
+      console.log('\n\x1b[31m⚠️ Conflicts Detected (Active runtime has newer edits):\x1b[0m');
+      report.conflicts.forEach(c => console.log(`  ✖ ${c.file}: ${c.details}`));
+      console.log('\x1b[90mUse `hud deploy --force` to overwrite active runtime files.\x1b[0m');
+    }
+
+    process.exit(report.success ? 0 : 1);
+  }
 
   if (cmd === 'check' || cmd === 'health' || cmd === 'doctor' || cmd === 'status-check') {
     const isJson = args.includes('--json') || args.includes('-j');
