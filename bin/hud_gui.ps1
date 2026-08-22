@@ -1,9 +1,8 @@
 # =====================================================================
 # hud_gui.ps1 -- Native Lightweight Windows GUI for HUD Configuration
 # =====================================================================
-# v2.0: Multi-line (1-4), text condensing (compact_mode + per-item
-# item_styles), non-destructive JSON persistence, fork advisory item,
-# dynamic compact-mode live preview.
+# v2.3.1: Resizable Sizable Window, Responsive Anchors, Generous Bounds,
+# Non-destructive JSON Persistence, Multi-line (1-4), Dynamic Preview.
 # =====================================================================
 try {
     Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
@@ -12,10 +11,6 @@ try {
     Write-Error "Windows Forms is not available in the current environment."
     exit 1
 }
-
-try {
-    [void][System.Windows.Forms.Application]::SetHighDpiMode([System.Windows.Forms.HighDpiMode]::PerMonitorV2)
-} catch {}
 
 try {
     [void][System.Windows.Forms.Application]::EnableVisualStyles()
@@ -197,9 +192,9 @@ $clrBtnHover  = [System.Drawing.Color]::FromArgb(45, 52, 78)
 $fontUI      = New-Object System.Drawing.Font('Segoe UI', 9.5)
 $fontBold    = New-Object System.Drawing.Font('Segoe UI', 9.5, [System.Drawing.FontStyle]::Bold)
 $fontSmall   = New-Object System.Drawing.Font('Segoe UI', 8.5)
-$fontMono    = New-Object System.Drawing.Font('Consolas', 9, [System.Drawing.FontStyle]::Bold)
-$fontPreview = New-Object System.Drawing.Font('Cascadia Code', 9)
-try { $fontPreview = New-Object System.Drawing.Font('Cascadia Code', 9) } catch { $fontPreview = $fontMono }
+$fontMono    = New-Object System.Drawing.Font('Consolas', 9.5, [System.Drawing.FontStyle]::Bold)
+$fontPreview = New-Object System.Drawing.Font('Cascadia Code', 9.5)
+try { $fontPreview = New-Object System.Drawing.Font('Cascadia Code', 9.5) } catch { $fontPreview = $fontMono }
 
 # -----------------------------------------------------------------------
 # Helper: create styled button
@@ -230,14 +225,17 @@ function New-StyledLabel([string]$text, [int]$x, [int]$y, [int]$w, [int]$h, [Sys
 }
 
 # -----------------------------------------------------------------------
-# Main Form
+# Main Form (Fully Resizable & Maximizable)
 # -----------------------------------------------------------------------
 $form = New-Object System.Windows.Forms.Form
 $form.Text            = 'Antigravity CLI (AGY) - Statusline HUD Configurator'
-$form.Size            = New-Object System.Drawing.Size(1000, 780)
+$form.ClientSize      = New-Object System.Drawing.Size(1060, 800)
+$form.MinimumSize     = New-Object System.Drawing.Size(950, 680)
 $form.StartPosition   = 'CenterScreen'
-$form.FormBorderStyle = 'FixedDialog'
-$form.MaximizeBox     = $false
+$form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::Sizable
+$form.MaximizeBox     = $true
+$form.MinimizeBox     = $true
+$form.AutoScroll      = $true
 $form.BackColor       = $clrBg
 $form.ForeColor       = $clrFg
 $form.Font            = $fontUI
@@ -248,7 +246,8 @@ $form.Font            = $fontUI
 $grpPreview = New-Object System.Windows.Forms.GroupBox
 $grpPreview.Text      = '  Live AGY Statusline HUD Preview  '
 $grpPreview.Location  = New-Object System.Drawing.Point(15, 10)
-$grpPreview.Size      = New-Object System.Drawing.Size(960, 130)
+$grpPreview.Size      = New-Object System.Drawing.Size(1030, 135)
+$grpPreview.Anchor    = [System.Windows.Forms.AnchorStyles]'Top, Left, Right'
 $grpPreview.ForeColor = $clrBlue
 $grpPreview.BackColor = $clrBgPanel
 $form.Controls.Add($grpPreview)
@@ -256,8 +255,9 @@ $form.Controls.Add($grpPreview)
 $previewLabels = @()
 for ($pi = 0; $pi -lt 4; $pi++) {
     $lbl = New-Object System.Windows.Forms.Label
-    $lbl.Location  = New-Object System.Drawing.Point(12, (20 + $pi * 26))
-    $lbl.Size      = New-Object System.Drawing.Size(930, 24)
+    $lbl.Location  = New-Object System.Drawing.Point(12, (22 + $pi * 26))
+    $lbl.Size      = New-Object System.Drawing.Size(1000, 24)
+    $lbl.Anchor    = [System.Windows.Forms.AnchorStyles]'Top, Left, Right'
     $lbl.Font      = $fontPreview
     $lbl.ForeColor = switch ($pi) {
         0 { $clrCyan }
@@ -274,18 +274,19 @@ for ($pi = 0; $pi -lt 4; $pi++) {
 # SECTION 2: Global Controls Bar
 # =====================================================================
 $pnlControls = New-Object System.Windows.Forms.Panel
-$pnlControls.Location  = New-Object System.Drawing.Point(15, 148)
-$pnlControls.Size      = New-Object System.Drawing.Size(960, 44)
+$pnlControls.Location  = New-Object System.Drawing.Point(15, 152)
+$pnlControls.Size      = New-Object System.Drawing.Size(1030, 44)
+$pnlControls.Anchor    = [System.Windows.Forms.AnchorStyles]'Top, Left, Right'
 $pnlControls.BackColor = $clrBgPanel
 $form.Controls.Add($pnlControls)
 
 # -- Line Count label + combo
-$lblLineCount = New-StyledLabel 'Lines:' 8 12 44 20 $clrBlue $fontBold
+$lblLineCount = New-StyledLabel 'Lines:' 10 12 48 20 $clrBlue $fontBold
 $pnlControls.Controls.Add($lblLineCount)
 
 $cmbLineCount = New-Object System.Windows.Forms.ComboBox
-$cmbLineCount.Location     = New-Object System.Drawing.Point(54, 10)
-$cmbLineCount.Size         = New-Object System.Drawing.Size(52, 24)
+$cmbLineCount.Location     = New-Object System.Drawing.Point(60, 10)
+$cmbLineCount.Size         = New-Object System.Drawing.Size(56, 24)
 $cmbLineCount.DropDownStyle = 'DropDownList'
 $cmbLineCount.BackColor    = $clrBgInput
 $cmbLineCount.ForeColor    = $clrFg
@@ -294,12 +295,12 @@ $cmbLineCount.SelectedItem = [string]$cfg.lines
 $pnlControls.Controls.Add($cmbLineCount)
 
 # -- Compact Mode label + combo
-$lblCompact = New-StyledLabel 'Global Text Mode:' 124 12 120 20 $clrBlue $fontBold
+$lblCompact = New-StyledLabel 'Global Text Mode:' 135 12 125 20 $clrBlue $fontBold
 $pnlControls.Controls.Add($lblCompact)
 
 $cmbCompact = New-Object System.Windows.Forms.ComboBox
-$cmbCompact.Location     = New-Object System.Drawing.Point(248, 10)
-$cmbCompact.Size         = New-Object System.Drawing.Size(100, 24)
+$cmbCompact.Location     = New-Object System.Drawing.Point(265, 10)
+$cmbCompact.Size         = New-Object System.Drawing.Size(105, 24)
 $cmbCompact.DropDownStyle = 'DropDownList'
 $cmbCompact.BackColor    = $clrBgInput
 $cmbCompact.ForeColor    = $clrFg
@@ -308,15 +309,15 @@ $cmbCompact.SelectedItem = $cfg.compact_mode
 if ($cmbCompact.SelectedIndex -lt 0) { $cmbCompact.SelectedIndex = 0 }
 $pnlControls.Controls.Add($cmbCompact)
 
-$lblCompactHint = New-StyledLabel '(auto = adapts to terminal width)' 354 13 230 18 $clrMuted $fontSmall
+$lblCompactHint = New-StyledLabel '(auto = adapts to terminal width)' 380 13 230 18 $clrMuted $fontSmall
 $pnlControls.Controls.Add($lblCompactHint)
 
 # -- Separator label + combo
-$lblSep = New-StyledLabel 'Separator:' 596 12 78 20 $clrBlue $fontBold
+$lblSep = New-StyledLabel 'Separator:' 630 12 78 20 $clrBlue $fontBold
 $pnlControls.Controls.Add($lblSep)
 
 $cmbSep = New-Object System.Windows.Forms.ComboBox
-$cmbSep.Location     = New-Object System.Drawing.Point(676, 10)
+$cmbSep.Location     = New-Object System.Drawing.Point(712, 10)
 $cmbSep.Size         = New-Object System.Drawing.Size(80, 24)
 $cmbSep.DropDownStyle = 'DropDownList'
 $cmbSep.BackColor    = $clrBgInput
@@ -330,8 +331,9 @@ $pnlControls.Controls.Add($cmbSep)
 # -- Uptime seconds toggle
 $chkUptimeSeconds = New-Object System.Windows.Forms.CheckBox
 $chkUptimeSeconds.Text      = 'Session Uptime Seconds'
-$chkUptimeSeconds.Location  = New-Object System.Drawing.Point(770, 11)
-$chkUptimeSeconds.Size      = New-Object System.Drawing.Size(180, 22)
+$chkUptimeSeconds.Location  = New-Object System.Drawing.Point(815, 11)
+$chkUptimeSeconds.Size      = New-Object System.Drawing.Size(190, 22)
+$chkUptimeSeconds.Anchor    = [System.Windows.Forms.AnchorStyles]'Top, Right'
 $chkUptimeSeconds.ForeColor = $clrFg
 $chkUptimeSeconds.Checked   = ($cfg.session_uptime.show_seconds -ne $false)
 $pnlControls.Controls.Add($chkUptimeSeconds)
@@ -340,8 +342,9 @@ $pnlControls.Controls.Add($chkUptimeSeconds)
 # SECTION 3: TabControl for Lines 1-4 + Disabled
 # =====================================================================
 $tabCtrl = New-Object System.Windows.Forms.TabControl
-$tabCtrl.Location  = New-Object System.Drawing.Point(15, 200)
-$tabCtrl.Size      = New-Object System.Drawing.Size(640, 480)
+$tabCtrl.Location  = New-Object System.Drawing.Point(15, 204)
+$tabCtrl.Size      = New-Object System.Drawing.Size(550, 500)
+$tabCtrl.Anchor    = [System.Windows.Forms.AnchorStyles]'Top, Bottom, Left'
 $tabCtrl.BackColor = $clrBgCard
 $tabCtrl.Font      = $fontUI
 $form.Controls.Add($tabCtrl)
@@ -366,10 +369,11 @@ foreach ($lc in $lineConfigs) {
     $tabCtrl.TabPages.Add($tp)
     $lineTabs[$lc.Key] = $tp
 
-    # List box (HorizontalScrollbar = $false to prevent left clipping auto-scroll)
+    # List box
     $lb = New-Object System.Windows.Forms.ListBox
-    $lb.Location            = New-Object System.Drawing.Point(8, 8)
-    $lb.Size                = New-Object System.Drawing.Size(360, 390)
+    $lb.Location            = New-Object System.Drawing.Point(10, 10)
+    $lb.Size                = New-Object System.Drawing.Size(350, 440)
+    $lb.Anchor              = [System.Windows.Forms.AnchorStyles]'Top, Bottom, Left'
     $lb.BackColor           = $clrBgInput
     $lb.ForeColor           = $clrFg
     $lb.BorderStyle         = 'FixedSingle'
@@ -380,7 +384,7 @@ foreach ($lc in $lineConfigs) {
     $lineListBoxes[$lc.Key] = $lb
 
     # Move Up
-    $btnUp = New-StyledButton 'Up' 380 8 80 30 $clrBgCard $clrFg
+    $btnUp = New-StyledButton 'Up' 372 10 150 32 $clrBgCard $clrFg
     $btnUp.Tag = $lc.Key
     $tp.Controls.Add($btnUp)
     $btnUp.Add_Click({
@@ -400,7 +404,7 @@ foreach ($lc in $lineConfigs) {
     })
 
     # Move Down
-    $btnDn = New-StyledButton 'Down' 380 46 80 30 $clrBgCard $clrFg
+    $btnDn = New-StyledButton 'Down' 372 48 150 32 $clrBgCard $clrFg
     $btnDn.Tag = $lc.Key
     $tp.Controls.Add($btnDn)
     $btnDn.Add_Click({
@@ -420,7 +424,7 @@ foreach ($lc in $lineConfigs) {
     })
 
     # Disable
-    $btnDis = New-StyledButton 'Disable' 380 90 80 30 $clrBgCard $clrRed
+    $btnDis = New-StyledButton 'Disable' 372 90 150 32 $clrBgCard $clrRed
     $btnDis.Tag = $lc.Key
     $tp.Controls.Add($btnDis)
     $btnDis.Add_Click({
@@ -436,16 +440,16 @@ foreach ($lc in $lineConfigs) {
     })
 
     # Move to Line... label
-    $lblMoveTo = New-StyledLabel 'Move to:' 378 134 80 18 $clrMuted $fontSmall
+    $lblMoveTo = New-StyledLabel 'Move to:' 372 134 150 18 $clrMuted $fontSmall
     $tp.Controls.Add($lblMoveTo)
 
     # Move-to buttons for other lines
-    $moveY = 152
+    $moveY = 154
     foreach ($dest in $lineConfigs) {
         if ($dest.Key -eq $lc.Key) { continue }
         $destKey  = $dest.Key
         $srcKey   = $lc.Key
-        $btnMove  = New-StyledButton $dest.Name 378 $moveY 100 26 $clrBgCard $dest.Color
+        $btnMove  = New-StyledButton $dest.Name 372 $moveY 150 28 $clrBgCard $dest.Color
         $btnMove.Font = $fontSmall
         $btnMove.Tag  = "$srcKey|$destKey"
         $tp.Controls.Add($btnMove)
@@ -463,16 +467,16 @@ foreach ($lc in $lineConfigs) {
                 $lineListBoxes[$dk].SelectedIndex = $lineListBoxes[$dk].Items.Count - 1
             }
         })
-        $moveY += 30
+        $moveY += 32
     }
 
     # Item Style label + combo
-    $lblStyle = New-StyledLabel 'Item Style:' 378 310 80 18 $clrBlue $fontSmall
+    $lblStyle = New-StyledLabel 'Item Style:' 372 265 150 18 $clrBlue $fontSmall
     $tp.Controls.Add($lblStyle)
 
     $cmbItemStyle = New-Object System.Windows.Forms.ComboBox
-    $cmbItemStyle.Location      = New-Object System.Drawing.Point(378, 330)
-    $cmbItemStyle.Size          = New-Object System.Drawing.Size(100, 24)
+    $cmbItemStyle.Location      = New-Object System.Drawing.Point(372, 285)
+    $cmbItemStyle.Size          = New-Object System.Drawing.Size(150, 24)
     $cmbItemStyle.DropDownStyle = 'DropDownList'
     $cmbItemStyle.BackColor     = $clrBgInput
     $cmbItemStyle.ForeColor     = $clrFg
@@ -483,7 +487,7 @@ foreach ($lc in $lineConfigs) {
     $tp.Controls.Add($cmbItemStyle)
     $lineStyleCombos[$lc.Key]   = $cmbItemStyle
 
-    $btnApplyStyle = New-StyledButton 'Apply' 378 360 80 26 $clrBgCard $clrGreen
+    $btnApplyStyle = New-StyledButton 'Apply Style' 372 316 150 30 $clrBgCard $clrGreen
     $btnApplyStyle.Font = $fontSmall
     $btnApplyStyle.Tag  = $lc.Key
     $tp.Controls.Add($btnApplyStyle)
@@ -530,17 +534,18 @@ $tpDisabled.ForeColor = $clrMuted
 $tabCtrl.TabPages.Add($tpDisabled)
 
 $listDisabled = New-Object System.Windows.Forms.ListBox
-$listDisabled.Location            = New-Object System.Drawing.Point(8, 8)
-$listDisabled.Size                = New-Object System.Drawing.Size(360, 390)
+$listDisabled.Location            = New-Object System.Drawing.Point(10, 10)
+$listDisabled.Size                = New-Object System.Drawing.Size(350, 440)
+$listDisabled.Anchor              = [System.Windows.Forms.AnchorStyles]'Top, Bottom, Left'
 $listDisabled.BackColor           = $clrBgInput
 $listDisabled.ForeColor           = $clrMuted
 $listDisabled.BorderStyle         = 'FixedSingle'
 $listDisabled.HorizontalScrollbar = $false
 $tpDisabled.Controls.Add($listDisabled)
 
-$enableBtnY = 8
+$enableBtnY = 10
 foreach ($lc in $lineConfigs) {
-    $btnEn = New-StyledButton "Enable to $($lc.Name)" 378 $enableBtnY 165 30 $clrBgCard $lc.Color
+    $btnEn = New-StyledButton "Enable to $($lc.Name)" 372 $enableBtnY 150 32 $clrBgCard $lc.Color
     $btnEn.Font = $fontSmall
     $btnEn.Tag  = $lc.Key
     $tpDisabled.Controls.Add($btnEn)
@@ -556,7 +561,7 @@ foreach ($lc in $lineConfigs) {
             Refresh-UI
         }
     })
-    $enableBtnY += 36
+    $enableBtnY += 38
 }
 
 # =====================================================================
@@ -564,26 +569,29 @@ foreach ($lc in $lineConfigs) {
 # =====================================================================
 $grpStyles = New-Object System.Windows.Forms.GroupBox
 $grpStyles.Text      = '  AGY Item Style Overrides  '
-$grpStyles.Location  = New-Object System.Drawing.Point(665, 200)
-$grpStyles.Size      = New-Object System.Drawing.Size(310, 480)
+$grpStyles.Location  = New-Object System.Drawing.Point(580, 204)
+$grpStyles.Size      = New-Object System.Drawing.Size(465, 500)
+$grpStyles.Anchor    = [System.Windows.Forms.AnchorStyles]'Top, Bottom, Left, Right'
 $grpStyles.ForeColor = $clrBlue
 $grpStyles.BackColor = $clrBgPanel
 $form.Controls.Add($grpStyles)
 
-$lblStylesHint = New-StyledLabel 'Per-item overrides (overrides Global Text Mode):' 10 20 290 18 $clrMuted $fontSmall
+$lblStylesHint = New-StyledLabel 'Per-item overrides (overrides Global Text Mode):' 12 22 430 18 $clrMuted $fontSmall
 $grpStyles.Controls.Add($lblStylesHint)
 
 $listStyles = New-Object System.Windows.Forms.ListBox
-$listStyles.Location    = New-Object System.Drawing.Point(10, 42)
-$listStyles.Size        = New-Object System.Drawing.Size(288, 300)
+$listStyles.Location    = New-Object System.Drawing.Point(12, 45)
+$listStyles.Size        = New-Object System.Drawing.Size(440, 370)
+$listStyles.Anchor      = [System.Windows.Forms.AnchorStyles]'Top, Bottom, Left, Right'
 $listStyles.BackColor   = $clrBgInput
 $listStyles.ForeColor   = $clrFg
 $listStyles.BorderStyle = 'FixedSingle'
 $listStyles.Font        = $fontSmall
 $grpStyles.Controls.Add($listStyles)
 
-$btnClearOneStyle = New-StyledButton 'Clear Selected Override' 10 352 180 28 $clrBgCard $clrYellow
-$btnClearOneStyle.Font = $fontSmall
+$btnClearOneStyle = New-StyledButton 'Clear Selected Override' 12 425 200 32 $clrBgCard $clrYellow
+$btnClearOneStyle.Font   = $fontSmall
+$btnClearOneStyle.Anchor = [System.Windows.Forms.AnchorStyles]'Bottom, Left'
 $grpStyles.Controls.Add($btnClearOneStyle)
 $btnClearOneStyle.Add_Click({
     $sel = $listStyles.SelectedItem
@@ -594,35 +602,40 @@ $btnClearOneStyle.Add_Click({
     }
 })
 
-$btnResetAllStyles = New-StyledButton 'Reset All Styles' 10 388 180 28 $clrBgCard $clrRed
-$btnResetAllStyles.Font = $fontSmall
+$btnResetAllStyles = New-StyledButton 'Reset All Styles' 220 425 180 32 $clrBgCard $clrRed
+$btnResetAllStyles.Font   = $fontSmall
+$btnResetAllStyles.Anchor = [System.Windows.Forms.AnchorStyles]'Bottom, Left'
 $grpStyles.Controls.Add($btnResetAllStyles)
 $btnResetAllStyles.Add_Click({
     $cfg.item_styles = @{}
     Refresh-UI
 })
 
-$lblStyleNote = New-StyledLabel 'full  = rich detail | short = abbreviated | minimal = icons only' 10 425 290 30 $clrMuted $fontSmall
+$lblStyleNote = New-StyledLabel 'full  = rich detail | short = abbreviated | minimal = icons only' 12 465 440 26 $clrMuted $fontSmall
 $lblStyleNote.AutoSize = $false
+$lblStyleNote.Anchor   = [System.Windows.Forms.AnchorStyles]'Bottom, Left, Right'
 $grpStyles.Controls.Add($lblStyleNote)
 
 # =====================================================================
 # SECTION 5: Bottom Bar (Reset / Save / Cancel)
 # =====================================================================
 $pnlBottom = New-Object System.Windows.Forms.Panel
-$pnlBottom.Location  = New-Object System.Drawing.Point(15, 690)
-$pnlBottom.Size      = New-Object System.Drawing.Size(960, 44)
+$pnlBottom.Location  = New-Object System.Drawing.Point(15, 715)
+$pnlBottom.Size      = New-Object System.Drawing.Size(1030, 48)
+$pnlBottom.Anchor    = [System.Windows.Forms.AnchorStyles]'Bottom, Left, Right'
 $pnlBottom.BackColor = $clrBgPanel
 $form.Controls.Add($pnlBottom)
 
-$btnReset = New-StyledButton 'Reset to Defaults' 0 7 140 30 $clrBgCard $clrMuted
+$btnReset = New-StyledButton 'Reset to Defaults' 0 8 160 32 $clrBgCard $clrMuted
 $pnlBottom.Controls.Add($btnReset)
 
-$btnSave = New-StyledButton 'Save & Apply' 700 5 140 34 ([System.Drawing.Color]::FromArgb(36, 130, 150)) ([System.Drawing.Color]::White)
-$btnSave.Font = $fontBold
+$btnSave = New-StyledButton 'Save & Apply' 740 6 150 36 ([System.Drawing.Color]::FromArgb(36, 130, 150)) ([System.Drawing.Color]::White)
+$btnSave.Font   = $fontBold
+$btnSave.Anchor = [System.Windows.Forms.AnchorStyles]'Top, Right'
 $pnlBottom.Controls.Add($btnSave)
 
-$btnCancel = New-StyledButton 'Cancel' 848 7 110 30 $clrBgCard $clrMuted
+$btnCancel = New-StyledButton 'Cancel' 905 8 120 32 $clrBgCard $clrMuted
+$btnCancel.Anchor = [System.Windows.Forms.AnchorStyles]'Top, Right'
 $pnlBottom.Controls.Add($btnCancel)
 
 # =====================================================================
