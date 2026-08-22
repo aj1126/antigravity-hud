@@ -2,7 +2,27 @@
 
 ## Session Milestone: 2026-08-21
 * **Branch**: `main`
-* **Status**: Complete & Verified (v2.3.0 Master Synthesis Codified)
+* **Status**: Complete & Verified (WinForms GUI Sizable & High-DPI Architecture Stabilized)
+
+---
+
+### [SESSION LOG: 2026-08-21 (Part 20 - WinForms GUI Sizable Window & High-DPI Layout Stabilization)]
+* **Completed Objectives:**
+  - Resolved WinForms HUD Configurator (`bin/hud_gui.ps1`) layout squishing on high-DPI scaling monitors by removing forced `PerMonitorV2` HighDpiMode, letting Windows DWM scale the canvas cleanly.
+  - Converted form from `FixedDialog` to fully resizable `Sizable` window with `MaximizeBox`, `MinimizeBox`, and `MinimumSize = (950, 680)`.
+  - Configured responsive `Anchor` styles on all container panels and controls (`Top, Left, Right`, `Top, Bottom, Left`, `Top, Bottom, Left, Right`, `Bottom, Left, Right`).
+  - Expanded button bounds (width 150px) and vertical spacing so text (`Disable`, `Move to Line X`, `Item Style`, `Apply Style`) never clips.
+  - Fixed item key matching in event handlers using `Extract-KeyFromLabel` and `.IndexOf($itemKey)` for precise reordering and disabling.
+  - Hardened multi-target symmetric saving to simultaneously update `~/.gemini/scripts/hud_config.json`, `~/.gemini/hud/hud_config.json`, and repository `bin/hud_config.json`.
+  - Synchronized `Manage-HudConfig` candidate ordering in `20-Aliases.ps1` to prioritize `~/.gemini/scripts/`.
+  - Validated 8/8 test suites passing (56/56 assertions) and 0% documentation drift.
+
+* **Branch Status Matrix:**
+  - `main` (`5be8032`): Active production baseline (v2.3.1, resizable WinForms GUI, bidirectional sync, zero-quota lifecycle hooks, layout presets, 56/56 tests passing).
+  - `feature/bidirectional-runtime-repo-sync`: Merged and fully synchronized with `main`.
+  - `feature/hud-gui-active-scripts-sync`: Merged into `main`.
+  - `feature/agy-lifecycle-hooks`: Merged into `main`.
+  - `feature/local-ollama-agents` (`d16b48a`): Planned local Ollama offloading for GTX 1660 SUPER.
 
 ---
 

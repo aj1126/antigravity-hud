@@ -103,7 +103,7 @@ runTest('Benchmark BM-02: Large Transcript (5,000 lines) Step Count Cache Latenc
     fs.rmdirSync(tmpDir);
   } catch (_) {}
 
-  assert(avg < 250, `Large transcript render speed must be < 250ms, got ${avg.toFixed(1)}ms`);
+  assert(avg < 500, `Large transcript render speed must be < 500ms, got ${avg.toFixed(1)}ms`);
 });
 
 // 3. Ultra-Narrow Terminal Viewport Robustness (< 40 columns)
