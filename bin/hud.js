@@ -92,7 +92,12 @@ function loadConfig() {
     if (fs.existsSync(cfgPath)) {
       const parsed = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
       const parsedLine2 = Array.isArray(parsed.line2) ? parsed.line2 : DEFAULT_CONFIG.line2;
-      if (!parsedLine2.includes('fork') && !parsed.disabled?.includes('fork')) {
+      const hasForkAnywhere = (Array.isArray(parsed.line1) && parsed.line1.includes('fork')) ||
+        (Array.isArray(parsed.line2) && parsed.line2.includes('fork')) ||
+        (Array.isArray(parsed.line3) && parsed.line3.includes('fork')) ||
+        (Array.isArray(parsed.line4) && parsed.line4.includes('fork')) ||
+        (Array.isArray(parsed.disabled) && parsed.disabled.includes('fork'));
+      if (!hasForkAnywhere) {
         const ctxIdx = parsedLine2.indexOf('context');
         if (ctxIdx >= 0) {
           parsedLine2.splice(ctxIdx + 1, 0, 'fork');

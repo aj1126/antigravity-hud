@@ -14,11 +14,11 @@ try {
 }
 
 try {
-    [System.Windows.Forms.Application]::SetHighDpiMode([System.Windows.Forms.HighDpiMode]::PerMonitorV2)
+    [void][System.Windows.Forms.Application]::SetHighDpiMode([System.Windows.Forms.HighDpiMode]::PerMonitorV2)
 } catch {}
 
 try {
-    [System.Windows.Forms.Application]::EnableVisualStyles()
+    [void][System.Windows.Forms.Application]::EnableVisualStyles()
 } catch {}
 
 $configCandidates = @(
@@ -386,13 +386,16 @@ foreach ($lc in $lineConfigs) {
     $btnUp.Add_Click({
         $key = $this.Tag
         $lb2 = $lineListBoxes[$key]
-        $idx = $lb2.SelectedIndex
-        if ($idx -gt 0) {
-            $item = $cfg[$key][$idx]
-            $cfg[$key].RemoveAt($idx)
-            $cfg[$key].Insert($idx - 1, $item)
-            Refresh-UI
-            $lineListBoxes[$key].SelectedIndex = $idx - 1
+        $sel = $lb2.SelectedItem
+        if ($sel) {
+            $itemKey = Extract-KeyFromLabel $sel
+            $realIdx = $cfg[$key].IndexOf($itemKey)
+            if ($realIdx -gt 0) {
+                $cfg[$key].RemoveAt($realIdx)
+                $cfg[$key].Insert($realIdx - 1, $itemKey)
+                Refresh-UI
+                $lb2.SelectedIndex = [Math]::Max(0, $lb2.SelectedIndex - 1)
+            }
         }
     })
 
@@ -403,13 +406,16 @@ foreach ($lc in $lineConfigs) {
     $btnDn.Add_Click({
         $key = $this.Tag
         $lb2 = $lineListBoxes[$key]
-        $idx = $lb2.SelectedIndex
-        if ($idx -ge 0 -and $idx -lt ($cfg[$key].Count - 1)) {
-            $item = $cfg[$key][$idx]
-            $cfg[$key].RemoveAt($idx)
-            $cfg[$key].Insert($idx + 1, $item)
-            Refresh-UI
-            $lineListBoxes[$key].SelectedIndex = $idx + 1
+        $sel = $lb2.SelectedItem
+        if ($sel) {
+            $itemKey = Extract-KeyFromLabel $sel
+            $realIdx = $cfg[$key].IndexOf($itemKey)
+            if ($realIdx -ge 0 -and $realIdx -lt ($cfg[$key].Count - 1)) {
+                $cfg[$key].RemoveAt($realIdx)
+                $cfg[$key].Insert($realIdx + 1, $itemKey)
+                Refresh-UI
+                $lb2.SelectedIndex = [Math]::Min($lb2.Items.Count - 1, $lb2.SelectedIndex + 1)
+            }
         }
     })
 
@@ -419,11 +425,12 @@ foreach ($lc in $lineConfigs) {
     $tp.Controls.Add($btnDis)
     $btnDis.Add_Click({
         $key = $this.Tag
-        $idx = $lineListBoxes[$key].SelectedIndex
-        if ($idx -ge 0) {
-            $itemKey = $cfg[$key][$idx]
-            $cfg[$key].RemoveAt($idx)
-            if (-not $cfg.disabled.Contains($itemKey)) { $cfg.disabled.Add($itemKey) }
+        $lb2 = $lineListBoxes[$key]
+        $sel = $lb2.SelectedItem
+        if ($sel) {
+            $itemKey = Extract-KeyFromLabel $sel
+            [void]$cfg[$key].Remove($itemKey)
+            if (-not $cfg.disabled.Contains($itemKey)) { [void]$cfg.disabled.Add($itemKey) }
             Refresh-UI
         }
     })
@@ -445,11 +452,13 @@ foreach ($lc in $lineConfigs) {
         $btnMove.Add_Click({
             $parts = $this.Tag -split '\|'
             $sk = $parts[0]; $dk = $parts[1]
-            $idx = $lineListBoxes[$sk].SelectedIndex
-            if ($idx -ge 0) {
-                $itemKey = $cfg[$sk][$idx]
-                $cfg[$sk].RemoveAt($idx)
-                $cfg[$dk].Add($itemKey)
+            $sel = $lineListBoxes[$sk].SelectedItem
+            if ($sel) {
+                $itemKey = Extract-KeyFromLabel $sel
+                [void]$cfg[$sk].Remove($itemKey)
+                if (-not $cfg[$dk].Contains($itemKey)) {
+                    [void]$cfg[$dk].Add($itemKey)
+                }
                 Refresh-UI
                 $lineListBoxes[$dk].SelectedIndex = $lineListBoxes[$dk].Items.Count - 1
             }
@@ -487,7 +496,7 @@ foreach ($lc in $lineConfigs) {
             $cmb      = $lineStyleCombos[$key]
             $styleSel = $cmb.SelectedItem
             if ($styleSel -eq 'auto') {
-                $cfg.item_styles.Remove($itemKey)
+                [void]$cfg.item_styles.Remove($itemKey)
             } else {
                 $cfg.item_styles[$itemKey] = $styleSel
             }
@@ -540,9 +549,9 @@ foreach ($lc in $lineConfigs) {
         $sel = $listDisabled.SelectedItem
         if ($sel) {
             $itemKey = Extract-KeyFromLabel $sel
-            $cfg.disabled.Remove($itemKey)
+            [void]$cfg.disabled.Remove($itemKey)
             if (-not $cfg[$destKey].Contains($itemKey)) {
-                $cfg[$destKey].Add($itemKey)
+                [void]$cfg[$destKey].Add($itemKey)
             }
             Refresh-UI
         }
@@ -580,7 +589,7 @@ $btnClearOneStyle.Add_Click({
     $sel = $listStyles.SelectedItem
     if ($sel -and $sel -match '^\s*(.+?)\s*->\s*') {
         $key = $matches[1].Trim()
-        $cfg.item_styles.Remove($key)
+        [void]$cfg.item_styles.Remove($key)
         Refresh-UI
     }
 })
@@ -646,6 +655,17 @@ function Refresh-UI {
         if ($prev -ge 0 -and $prev -lt $lb2.Items.Count) { $lb2.SelectedIndex = $prev }
     }
 
+    # Update tab headers with active line count indicator
+    for ($i = 0; $i -lt 4; $i++) {
+        $lc = $lineConfigs[$i]
+        $tp = $lineTabs[$lc.Key]
+        if ($i -ge $cfg.lines) {
+            $tp.Text = "$($lc.Name) (Inactive)"
+        } else {
+            $tp.Text = $lc.Name
+        }
+    }
+
     # Update disabled listbox: items in disabled list OR not in any line
     $listDisabled.Items.Clear()
     $allKnown    = [System.Collections.Generic.HashSet[string]]::new([string[]]$itemMeta.Keys)
@@ -688,7 +708,7 @@ function Refresh-UI {
 function Update-Preview {
     $sep      = " $($cfg.separator) "
     $lineKeys = @('line1','line2','line3','line4')
-    $numLines = [int]$cmbLineCount.SelectedItem
+    $numLines = if ($cfg.lines) { [int]$cfg.lines } else { 2 }
 
     for ($i = 0; $i -lt 4; $i++) {
         $lbl = $previewLabels[$i]
@@ -719,7 +739,7 @@ $cmbLineCount.Add_SelectedIndexChanged({
     if ($cmbLineCount.SelectedItem) {
         $cfg.lines   = [int]$cmbLineCount.SelectedItem
         $cfg.two_line = $cfg.lines -ge 2
-        Update-Preview
+        Refresh-UI
     }
 })
 
@@ -797,18 +817,29 @@ $btnSave.Add_Click({
 
     $json      = $saveData | ConvertTo-Json -Depth 6
     $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-    [System.IO.File]::WriteAllText($configPath, $json, $utf8NoBom)
 
-    # Dual-sync to ~/.gemini/hud/hud_config.json if present
-    $hudMirror = Join-Path $HOME ".gemini\hud\hud_config.json"
-    if ($configPath -ne $hudMirror -and (Test-Path (Split-Path $hudMirror -Parent))) {
-        try {
-            [System.IO.File]::WriteAllText($hudMirror, $json, $utf8NoBom)
-        } catch {}
+    # Save symmetrically to all active targets and source repo
+    $targets = @(
+        $configPath,
+        (Join-Path $HOME ".gemini\scripts\hud_config.json"),
+        (Join-Path $HOME ".gemini\hud\hud_config.json")
+    )
+    $repoConfig = "B:\Repos\antigravity-hud\bin\hud_config.json"
+    if (Test-Path $repoConfig) { $targets += $repoConfig }
+
+    $written = @()
+    foreach ($t in ($targets | Select-Object -Unique)) {
+        $parent = Split-Path $t -Parent
+        if (Test-Path $parent) {
+            try {
+                [System.IO.File]::WriteAllText($t, $json, $utf8NoBom)
+                $written += $t
+            } catch {}
+        }
     }
 
     [System.Windows.Forms.MessageBox]::Show(
-        "HUD configuration saved to:`n$configPath",
+        "HUD configuration saved to:`n$($written -join "`n")",
         'Saved',
         [System.Windows.Forms.MessageBoxButtons]::OK,
         [System.Windows.Forms.MessageBoxIcon]::Information
