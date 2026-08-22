@@ -2,7 +2,26 @@
 
 ## Session Milestone: 2026-08-21
 * **Branch**: `main`
-* **Status**: Complete & Verified (WinForms GUI Sizable & High-DPI Architecture Stabilized)
+* **Status**: Complete & Verified (Section 16 WinForms High-DPI & Pipeline Hygiene Codified)
+
+---
+
+### [SESSION LOG: 2026-08-21 (Part 21 - WinForms High-DPI Resizability, Pipeline Hygiene & Symmetric Save Codification)]
+* **Completed Objectives:**
+  - Formally approved and codified **Section 16 (WinForms High-DPI Resizability, Pipeline Hygiene & Symmetric Save Invariant)** into canonical knowledge storage `~/.gemini/antigravity/knowledge/runtime_drift_and_self_healing_protocol.md`.
+  - Enforced mandatory `FormBorderStyle = 'Sizable'`, `MaximizeBox = $true`, `AutoScroll = $true`, and responsive `Anchor` styles for all native desktop tools.
+  - Codified the prohibition of `SetHighDpiMode(PerMonitorV2)` in uncompiled PowerShell scripts to protect against font dilation coordinate crushing.
+  - Enforced `[void]` prefixes for all .NET method return values to eliminate `True`/`False` stdout leakage into terminal pipelines.
+  - Codified canonical `.IndexOf($itemKey)` key-based resolution for filtered/reordered ListBox event handlers.
+  - Codified multi-target symmetric JSON configuration writes across `~/.gemini/scripts/`, `~/.gemini/hud/`, and `bin/`.
+  - Mirrored learning proposal artifacts and quad-synchronized progress logs across repository workspace, global machine root (`~/.gemini/`), and cross-session knowledge storage.
+
+* **Branch Status Matrix:**
+  - `main` (`8d7401e`): Active production baseline (v2.3.1, resizable WinForms GUI, bidirectional sync, zero-quota lifecycle hooks, layout presets, 56/56 tests passing).
+  - `feature/bidirectional-runtime-repo-sync`: Merged and fully synchronized with `main`.
+  - `feature/hud-gui-active-scripts-sync`: Merged into `main`.
+  - `feature/agy-lifecycle-hooks`: Merged into `main`.
+  - `feature/local-ollama-agents` (`d16b48a`): Planned local Ollama offloading for GTX 1660 SUPER.
 
 ---
 
