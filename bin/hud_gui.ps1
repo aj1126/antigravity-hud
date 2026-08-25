@@ -63,6 +63,8 @@ $itemMeta = [ordered]@{
     'fork'         = 'Fork Advisory Milestone'
     'quota_5h'     = '5-Hour Quota & Reset'
     'quota_weekly' = 'Weekly Quota Reserve'
+    'credits'      = 'AGY Credit Balance'
+    'plan_tier'    = 'Account Subscription Plan'
     'mcp'          = 'Registered MCP Servers'
     'subagents'    = 'Active Subagents Count'
     'tasks'        = 'Background Tasks'
@@ -83,6 +85,8 @@ $previewText = @{
     'fork'         = @{ full = 'Fork @ 60%'; short = 'Fork: 60%'; minimal = 'F60' }
     'quota_5h'     = @{ full = 'Quota: 56% (reset 2h 23m)'; short = '56% 2h23m'; minimal = '56%' }
     'quota_weekly' = @{ full = 'Weekly: 80%'; short = 'Wk: 80%'; minimal = '80%' }
+    'credits'      = @{ full = '💳 1,250 Credits'; short = '💳 1.25k'; minimal = '💳' }
+    'plan_tier'    = @{ full = '✨ Google AI Pro'; short = '✨ Pro'; minimal = '✨' }
     'mcp'          = @{ full = '14 MCP Servers'; short = '14 MCP'; minimal = '14M' }
     'subagents'    = @{ full = '1 subagent'; short = '1 sub'; minimal = '1S' }
     'tasks'        = @{ full = '1 task running'; short = '1 task'; minimal = '1T' }

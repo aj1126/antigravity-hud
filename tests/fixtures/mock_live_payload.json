@@ -40,5 +40,9 @@
     { "id": "sub-2", "state": "idle" }
   ],
   "artifact_count": 5,
-  "queue_count": 2
+  "queue_count": 2,
+  "credits": 2348,
+  "g1_credits": 2348,
+  "model_credits": 2348,
+  "plan_tier": "Google AI Pro"
 }

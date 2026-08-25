@@ -486,6 +486,8 @@
       fork: { label: '🍴 Fork Advisory', desc: 'Clean-state milestone /fork advisor' },
       quota_5h: { label: '⏳ 5h Quota', desc: '5-hour reserve % & reset countdown' },
       quota_weekly: { label: '📅 Weekly Quota', desc: 'Weekly quota reserve percentage' },
+      credits: { label: '💳 Credits', desc: 'Remaining Antigravity credit balance' },
+      plan_tier: { label: '✨ Plan Tier', desc: 'Subscription tier (Pro / Ultra / Free)' },
       mcp: { label: '🔌 MCP Servers', desc: 'Connected MCP tool count' },
       subagents: { label: '🤖 Subagents', desc: 'Active background subagent workers' },
       tasks: { label: '⚙️ Tasks', desc: 'Running background processes' },
@@ -695,6 +697,14 @@
           return '<span class="term-quota">Quota: 53% (↻ 3h 34m)</span>';
         case 'quota_weekly':
           return '<span class="term-wk">Wk: 27%</span>';
+        case 'credits':
+          if (st === 'minimal') return '<span class="term-credits">💳 1.2k</span>';
+          if (st === 'short') return '<span class="term-credits">💳 1.25k cred</span>';
+          return '<span class="term-credits">💳 1,250 Credits</span>';
+        case 'plan_tier':
+          if (st === 'minimal') return '<span class="term-plan">✨ Pro</span>';
+          if (st === 'short') return '<span class="term-plan">✨ Pro</span>';
+          return '<span class="term-plan">✨ Google AI Pro</span>';
         case 'mcp':
           return '<span class="term-mcp">🔌 15 MCP</span>';
         case 'subagents':

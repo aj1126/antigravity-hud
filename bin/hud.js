@@ -14,10 +14,10 @@ const DEFAULT_CONFIG = {
   separator: '│',
   compact_mode: 'auto',
   line1: ['workspace', 'git_status', 'model', 'state', 'auth', 'sandbox', 'session'],
-  line2: ['context', 'fork', 'quota_5h', 'quota_weekly', 'mcp', 'subagents', 'tasks', 'artifacts', 'queue'],
+  line2: ['context', 'fork', 'quota_5h', 'quota_weekly', 'credits', 'mcp', 'subagents', 'tasks', 'artifacts', 'queue'],
   line3: [],
   line4: [],
-  disabled: [],
+  disabled: ['plan_tier'],
   item_styles: {},
   session_uptime: {
     show_seconds: true,
@@ -2232,6 +2232,113 @@ function getQuotaSegments(payload, style5h = 'full', styleWk = 'full') {
   return { quota5hSegment, quotaWkSegment };
 }
 
+function getCreditsSegment(payload, style = 'full') {
+  let creditsVal = null;
+  let creditsUnit = 'cred';
+
+  // 1. Check direct payload fields (G1 / Model AI Credits)
+  if (typeof payload.g1_credits === 'number') creditsVal = payload.g1_credits;
+  else if (typeof payload.model_credits === 'number') creditsVal = payload.model_credits;
+  else if (typeof payload.available_credits === 'number') creditsVal = payload.available_credits;
+  else if (typeof payload.remaining_ai_credits === 'number') creditsVal = payload.remaining_ai_credits;
+  else if (typeof payload.ai_credits === 'number') creditsVal = payload.ai_credits;
+  else if (typeof payload.credits === 'number') creditsVal = payload.credits;
+  else if (typeof payload.credit_balance === 'number') creditsVal = payload.credit_balance;
+  else if (typeof payload.remaining_credits === 'number') creditsVal = payload.remaining_credits;
+  else if (typeof payload.balance === 'number') creditsVal = payload.balance;
+  else if (payload.account && typeof payload.account.credits === 'number') creditsVal = payload.account.credits;
+  else if (payload.account && typeof payload.account.balance === 'number') creditsVal = payload.account.balance;
+  else if (typeof payload.credits === 'string') {
+    const parsed = parseInt(payload.credits.replace(/[^0-9]/g, ''), 10);
+    creditsVal = isNaN(parsed) ? payload.credits.trim() : parsed;
+  } else if (typeof payload.remaining_ai_credits === 'string') {
+    const parsed = parseInt(payload.remaining_ai_credits.replace(/[^0-9]/g, ''), 10);
+    creditsVal = isNaN(parsed) ? payload.remaining_ai_credits.trim() : parsed;
+  } else if (typeof payload.balance === 'string') {
+    creditsVal = payload.balance.trim();
+  }
+
+  const isTestMode = Boolean(process.env.HUD_TEST_MODE || payload.is_test);
+  const creditsCacheFile = path.join(homeDir, '.gemini', 'tmp', 'last_credits.json');
+
+  if (!isTestMode && creditsVal !== null) {
+    try {
+      const cDir = path.dirname(creditsCacheFile);
+      if (!fs.existsSync(cDir)) fs.mkdirSync(cDir, { recursive: true });
+      fs.writeFileSync(creditsCacheFile, JSON.stringify({ credits: creditsVal, updatedAt: Date.now() }), 'utf8');
+    } catch (_) {}
+  } else if (!isTestMode && creditsVal === null && fs.existsSync(creditsCacheFile)) {
+    try {
+      const cached = JSON.parse(fs.readFileSync(creditsCacheFile, 'utf8'));
+      if (Date.now() - cached.updatedAt < 7 * 24 * 3600 * 1000) {
+        creditsVal = cached.credits;
+      }
+    } catch (_) {}
+  }
+
+  if (creditsVal === null) return '';
+
+  let displayStr = '';
+  if (typeof creditsVal === 'number') {
+    if (style === 'minimal') {
+      displayStr = creditsVal >= 1000 ? `${(creditsVal / 1000).toFixed(1)}k` : `${creditsVal}`;
+    } else if (style === 'short') {
+      displayStr = creditsVal >= 1000 ? `${(creditsVal / 1000).toFixed(1)}k` : `${creditsVal} ${creditsUnit}`;
+    } else {
+      displayStr = `${creditsVal.toLocaleString()} Credits`;
+    }
+  } else {
+    displayStr = String(creditsVal);
+  }
+
+  if (style === 'minimal') {
+    return `\x1b[38;2;245;169;127m💳 ${displayStr}\x1b[0m`;
+  }
+  return `\x1b[38;2;245;169;127m💳 ${displayStr}\x1b[0m`;
+}
+
+function getPlanTierSegment(payload, style = 'full') {
+  let tier = payload.plan_tier || payload.tier || payload.user_tier || payload.account_tier;
+  if (!tier && payload.account && payload.account.plan) {
+    tier = payload.account.plan;
+  }
+  if (!tier && payload.plan && typeof payload.plan === 'string') {
+    tier = payload.plan;
+  }
+
+  const isTestMode = Boolean(process.env.HUD_TEST_MODE || payload.is_test);
+  const planCacheFile = path.join(homeDir, '.gemini', 'tmp', 'last_plan.json');
+
+  if (!isTestMode && tier) {
+    try {
+      const pDir = path.dirname(planCacheFile);
+      if (!fs.existsSync(pDir)) fs.mkdirSync(pDir, { recursive: true });
+      fs.writeFileSync(planCacheFile, JSON.stringify({ tier, updatedAt: Date.now() }), 'utf8');
+    } catch (_) {}
+  } else if (!isTestMode && !tier && fs.existsSync(planCacheFile)) {
+    try {
+      const cached = JSON.parse(fs.readFileSync(planCacheFile, 'utf8'));
+      if (Date.now() - cached.updatedAt < 7 * 24 * 3600 * 1000) {
+        tier = cached.tier;
+      }
+    } catch (_) {}
+  }
+
+  if (!tier) return '';
+
+  let tierName = String(tier).trim();
+  if (style === 'minimal') {
+    if (tierName.toLowerCase().includes('pro')) tierName = 'Pro';
+    else if (tierName.toLowerCase().includes('ultra')) tierName = 'Ultra';
+    else if (tierName.toLowerCase().includes('free')) tierName = 'Free';
+    else tierName = tierName.split(' ')[0];
+  } else if (style === 'short') {
+    tierName = tierName.replace(/^Google\s+AI\s+/i, '').replace(/^Google\s+/i, '');
+  }
+
+  return `\x1b[35m✨ ${tierName}\x1b[0m`;
+}
+
 function getSessionUptime(payload) {
   if (typeof payload.session_duration_seconds === 'number' && payload.session_duration_seconds > 0) {
     return payload.session_duration_seconds;
@@ -2590,6 +2697,19 @@ process.stdin.on('end', () => {
       forkSegment = getForkAdvisory(payload, ctxPercent, cfg, git, stFork);
     }
 
+    // 13. Credits & Plan Tier
+    let creditsSegment = '';
+    if (activeItemSet.has('credits')) {
+      const stCred = resolveItemStyle('credits', cfg, width);
+      creditsSegment = getCreditsSegment(payload, stCred);
+    }
+
+    let planTierSegment = '';
+    if (activeItemSet.has('plan_tier') || activeItemSet.has('plan') || activeItemSet.has('tier')) {
+      const stPlan = resolveItemStyle('plan_tier', cfg, width);
+      planTierSegment = getPlanTierSegment(payload, stPlan);
+    }
+
     // Item Map
     const itemMap = {
       workspace: wsSegment,
@@ -2605,6 +2725,9 @@ process.stdin.on('end', () => {
       quota: [quota5hSegment, quotaWkSegment].filter(Boolean).join(' '),
       quota_5h: quota5hSegment,
       quota_weekly: quotaWkSegment,
+      credits: creditsSegment,
+      plan_tier: planTierSegment,
+      plan: planTierSegment,
       mcp: mcpSegment,
       tasks: taskSegment,
       subagents: subagentSegment,

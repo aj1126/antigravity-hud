@@ -1,4 +1,6 @@
 {
+  "name": "Pre-Credits Base Layout",
+  "description": "Archived snapshot of user HUD configuration prior to adding credits item",
   "lines": 4,
   "two_line": true,
   "separator": "│",
@@ -11,8 +13,7 @@
   "line2": [
     "context",
     "quota_5h",
-    "quota_weekly",
-    "credits"
+    "quota_weekly"
   ],
   "line3": [
     "mcp",
@@ -28,9 +29,7 @@
     "session",
     "fork"
   ],
-  "disabled": [
-    "plan_tier"
-  ],
+  "disabled": [],
   "item_styles": {},
   "session_uptime": {
     "show_seconds": true

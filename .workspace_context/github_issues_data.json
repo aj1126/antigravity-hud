@@ -1,0 +1,64 @@
+{
+  "namespace_contract": "agy:github:v1",
+  "schema_version": "1.1.0",
+  "generated_at": "2026-08-22T03:43:58Z",
+  "integrity_hash": "a219973bd67fa3ee25286d283395997976699946af147dcb6d214e5257095919",
+  "repository": {
+    "schema_version": "1.1.0",
+    "name": "antigravity-hud",
+    "full_name": "aj1126/antigravity-hud",
+    "owner": "aj1126",
+    "description": "Real-time multi-line TUI statusline HUD, live telemetry monitor, and interactive layout configurator for Antigravity AI sessions.",
+    "visibility": "public",
+    "default_branch": "main",
+    "topics": [],
+    "open_issues_count": 0,
+    "forks_count": 0,
+    "stargazers_count": 0,
+    "watchers_count": 0,
+    "created_at": "2026-08-17T22:25:56Z",
+    "updated_at": "2026-08-22T03:33:56Z",
+    "pushed_at": "2026-08-22T03:33:52Z",
+    "has_issues": true,
+    "has_projects": true,
+    "has_wiki": true,
+    "archived": false,
+    "disabled": false,
+    "license": "MIT",
+    "data_integrity_sha256": "a219973bd67fa3ee25286d283395997976699946af147dcb6d214e5257095919",
+    "last_sync_timestamp": "2026-08-22T03:43:58Z"
+  },
+  "issues_data": {
+    "schema_version": "1.1.0",
+    "repository": "aj1126/antigravity-hud",
+    "fetched_at": "2026-08-22T03:43:58Z",
+    "total_items_count": 1,
+    "open_issues_count": 0,
+    "open_pull_requests_count": 0,
+    "closed_count": 1,
+    "issues": [
+      {
+        "number": 1,
+        "title": "feat: v2.3.0 bidirectional runtime sync, zero-quota lifecycle hooks & layout presets",
+        "state": "CLOSED",
+        "author": "aj1126",
+        "created_at": "2026-08-21T22:28:46Z",
+        "updated_at": "2026-08-21T22:43:30Z",
+        "closed_at": "2026-08-21T22:43:30Z",
+        "html_url": "https://github.com/aj1126/antigravity-hud/pull/1",
+        "labels": [],
+        "milestone": null,
+        "assignees": [],
+        "comments_count": 0,
+        "body": "## 🚀 Overview & Key Deliverables\n\nThis PR introduces **v2.3.0** of the **Antigravity CLI (AGY) HUD System**, delivering bidirectional runtime/repo synchronization, zero-quota lifecycle hooks, multi-tier layout presets, and comprehensive self-healing automated regression suites.\n\n### 🌟 Key Enhancements\n\n1. **Bidirectional Active Runtime & Repository Sync Engine:**\n   - Introduced `Sync-AgyHud.ps1` with dual-direction synchronization:\n     - `deploy`: Syncs repository files to active runtime paths (`~/.gemini/scripts/`, `~/.gemini/hud/`).\n     - `backup`: Safely extracts runtime customizations back into the Git workspace with conflict protection.\n     - `diff`: Fast visual diffing across all monitored runtime paths.\n     - `check` & `repair`: SHA-256 drift detection, UTF-8 BOM sanitization, and missing property auto-hydration.\n   - Added native CLI shortcuts: `hud backup`, `hud deploy`, `hud check`, and `hud repair`.\n\n2. **Zero-Quota Antigravity Lifecycle Hooks Suite:**\n   - `hooks/on_session_start.ps1`: Automated pre-flight health audit, environment guardrails, and telemetry initialization.\n   - `hooks/on_session_exit.ps1`: Automated session resume point creation, perma-logging, and cross-session devlog sync.\n   - `hooks/pre_tool_guard.js`: Zero-quota guardrail against destructive subshell commands and quota runaway.\n   - `hooks/post_tool_format.js`: Auto-formatting and UTF-8 BOM preamble sanitization.\n\n3. **Layout Presets Library & CLI Selector:**\n   - Added pre-built, tested layout presets in `presets/`:\n     - `4line_command_center.json`: Comprehensive 4-line telemetry overview (Default).\n     - `3line_cockpit.json`: Dense 3-line cockpit layout.\n     - `2line_classic.json`: Lightweight 2-line classic HUD.\n     - `1line_compact.json`: Ultra-minimal 1-line statusline.\n   - Added `hud preset list`, `hud preset load <name>`, and `hud preset save <name>` subcommands.\n\n4. **WinForms GUI Active Config Synchronization:**\n   - Updated `bin/hud_gui.ps1` to target `~/.gemini/scripts/hud_config.json` as primary active config and dual-sync on save.\n\n5. **Master Test Suite Expansion (45/45 Tests Passing):**\n   - **Suite 1:** Node.js HUD Engine & CLI Subcommands Matrix (14 tests)\n   - **Suite 2:** WinForms Headless GUI Pester Tests (4 tests)\n   - **Suite 3:** Web GUI Template & Schema Integrity (3 tests)\n   - **Suite 4:** Settings Integration & Command Wiring (2 tests)\n   - **Suite 5:** Automated Checks, Drift Detection & Self-Healing Matrix (15 tests)\n   - **Suite 6:** Antigravity Lifecycle Hooks & Perma-Logging Matrix (7 tests)\n\n---\n\n### 🧪 Verification & Quality Gates\n\n- **Unit & Integration Tests:** 45 / 45 passed (100% green via `tests/run_all_hud_tests.ps1`)\n- **Merge Conflicts:** 0 conflicts against `main` (`git merge-tree` verified clean)\n- **Working Tree:** Clean (`git status`)\n\n---\n\n### 📦 Included Commits\n\n- `a939af5` chore(lifecycle): auto-sync session resume point and developer log\n- `fe2e94b` docs: record master learning synthesis and invariant codification milestone\n- `e6fc5ce` feat(presets): add layout presets library, hud preset CLI, and activate 4-line command center preset\n- `0d1eaea` docs: record review and debug verification milestone and zero-drift status\n- `794167c` docs: update README.md with v2.3.0 bidirectional sync and zero-quota lifecycle hooks\n- `1908ef8` feat(sync): implement active runtime and github repository bidirectional sync and backup engine\n- `7ac731e` docs: record deep-scan audit and health target parity codification milestone\n- `75b16a2` fix(health): include scripts/hud_config.json in health check targets and auto-hydration\n- `17ac341` docs: finalize master conversation learning synthesis and quad-sync logs\n- `aa13cb7` chore(lifecycle): generate session resume point and finalize pre-exit pipeline\n- `fd56efc` docs: record formal approval and persistence of architectural invariants and master plans\n- `d42b21c` docs: record WinForms GUI active scripts sync and master roadmap milestone\n- `f5ac27d` fix(gui): target ~/.gemini/scripts/hud_config.json as primary config and dual-sync on save\n- `ace66b4` docs: document active branch registry and integration roadmap in developer log\n- `6e6a7fb` feat(hooks): implement Zero-Quota Antigravity Lifecycle Hooks Suite with post-exit notifications and perma-logging",
+        "is_pull_request": true,
+        "pull_request_details": {
+          "draft": false,
+          "merged_at": "2026-08-21T22:43:29Z",
+          "html_url": "https://github.com/aj1126/antigravity-hud/pull/1"
+        },
+        "category": "General Engineering & Maintenance"
+      }
+    ]
+  }
+}
