@@ -103,8 +103,9 @@ try {
 - Branch: $($statusRecord.Branch)
 - Status: Session closed cleanly and quad-synced.
 "@
-    [System.IO.File]::WriteAllText($resumePointPath, $resumeContent)
-    [System.IO.File]::WriteAllText($latestResumePath, $resumeContent)
+    $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+    [System.IO.File]::WriteAllText($resumePointPath, $resumeContent, $utf8NoBom)
+    [System.IO.File]::WriteAllText($latestResumePath, $resumeContent, $utf8NoBom)
     $statusRecord.ResumePointCreated = $true
 
     # Quad-Sync Developer Log if present
