@@ -1614,7 +1614,10 @@ if (args.length > 0) {
 
   if (cmd === 'credits' || cmd === 'credit') {
     const rawVal = args.slice(1).join(' ').trim();
-    const creditsCacheFile = path.join(homeDir, '.gemini', 'tmp', 'last_credits.json');
+    const isTestMode = Boolean(process.env.HUD_TEST_MODE);
+    const creditsCacheFile = isTestMode
+      ? path.join(os.tmpdir(), 'hud_test_credits.json')
+      : path.join(homeDir, '.gemini', 'tmp', 'last_credits.json');
 
     if (!rawVal) {
       console.log('\x1b[1m\x1b[36m=== AGY HUD: Model AI Credits Telemetry ===\x1b[0m\n');
@@ -2321,7 +2324,9 @@ function getCreditsSegment(payload, style = 'full', isZeroQuota = false) {
   }
 
   const isTestMode = Boolean(process.env.HUD_TEST_MODE || payload.is_test);
-  const creditsCacheFile = path.join(homeDir, '.gemini', 'tmp', 'last_credits.json');
+  const creditsCacheFile = isTestMode
+    ? path.join(os.tmpdir(), 'hud_test_credits.json')
+    : path.join(homeDir, '.gemini', 'tmp', 'last_credits.json');
 
   if (!isTestMode && creditsVal !== null) {
     try {
