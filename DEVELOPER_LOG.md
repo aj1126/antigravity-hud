@@ -14,8 +14,9 @@
     - `hud credits <amount>`: Locally sets credit balance (supports integers like `2348` or currency like `$15.50`) with zero API token overhead.
     - `hud credits clear`: Safely unlinks and resets local credit cache.
   - Eliminated arbitrary 7-day cache TTL in `getCreditsSegment()`, ensuring user credit balances persist indefinitely until explicitly modified or updated.
-  - Implemented dynamic zero-quota alert styling: automatically elevates `credits` to bold vibrant amber `[0Q Active]` on Line 2 whenever 5-hour or weekly quota reaches 0% (`q5hPercent === 0`).
-  - Activated `"credits"` on Line 2 in active runtime configs (`~/.gemini/scripts/hud_config.json`, `~/.gemini/hud/hud_config.json`) and repository configs (`bin/hud_config.json`, `presets/`).
+  - Implemented dynamic zero-quota alert styling: automatically elevates `credits` to bold vibrant amber `[0Q Active]` whenever 5-hour or weekly quota reaches 0% (`q5hPercent === 0`).
+  - Activated `"credits"` at the end of Line 1 (`workspace`, `model`, `state`, `tasks`, `credits`) across active runtime configs (`~/.gemini/scripts/hud_config.json`, `~/.gemini/hud/hud_config.json`) and repository configs (`bin/hud_config.json`, `presets/`).
+  - Hardened test isolation: routed test cache writes and unlinks to `os.tmpdir()` when `HUD_TEST_MODE=1`, eliminating live cache pollution during automated test runs.
   - Updated SSOT documentation generator (`scripts/generate_docs.js`), regenerating `docs/CLI_REFERENCE.md`, `docs/CONFIGURATION_SCHEMA.md`, and `README.md` with 0% drift.
   - Expanded test suites (Suite 1: 14/14 tests passing, Suite 7: 7/7 tests passing, Suite 8: 4/4 tests passing, Total: 57/57 tests passing).
   - Validated bidirectional sync with `hud diff` (100% IN SYNC) and `hud check` (100% HEALTHY).
