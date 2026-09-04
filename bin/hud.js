@@ -1612,6 +1612,47 @@ if (args.length > 0) {
     process.exit(0);
   }
 
+  function extractCreditsFromVscdb() {
+    if (process.env.HUD_TEST_MODE) return null;
+    const dbPath = path.join(process.env.APPDATA || '', 'Antigravity', 'User', 'globalStorage', 'state.vscdb');
+    if (!fs.existsSync(dbPath)) return null;
+
+    const tmp = path.join(os.tmpdir(), 'tmp_credits_extract_' + Date.now() + '.vscdb');
+    try {
+      fs.copyFileSync(dbPath, tmp);
+      const val = execFileSync('sqlite3', [tmp, "SELECT value FROM ItemTable WHERE key = 'antigravityUnifiedStateSync.modelCredits';"], { encoding: 'utf8', timeout: 3000 }).trim();
+      if (!val) return null;
+
+      const buf = Buffer.from(val, 'base64');
+      const sentinelIdx = buf.indexOf('availableCreditsSentinelKey');
+      if (sentinelIdx === -1) return null;
+
+      const valSlice = buf.slice(sentinelIdx + 'availableCreditsSentinelKey'.length);
+      for (let i = 0; i < valSlice.length - 3; i++) {
+        const candidateStr = valSlice.slice(i, i + 4).toString('utf8');
+        if (/^[A-Za-z0-9+/]{4}$/.test(candidateStr)) {
+          try {
+            const innerBuf = Buffer.from(candidateStr, 'base64');
+            if (innerBuf.length >= 2 && (innerBuf[0] === 0x08 || innerBuf[0] === 0x10)) {
+              let v = 0, shift = 0;
+              for (let j = 1; j < innerBuf.length; j++) {
+                const b = innerBuf[j];
+                v |= (b & 0x7f) << shift;
+                if (!(b & 0x80)) break;
+                shift += 7;
+              }
+              if (v > 0) return v;
+            }
+          } catch (_) {}
+        }
+      }
+    } catch (_) {
+    } finally {
+      try { fs.unlinkSync(tmp); } catch (_) {}
+    }
+    return null;
+  }
+
   if (cmd === 'credits' || cmd === 'credit') {
     const rawVal = args.slice(1).join(' ').trim();
     const isTestMode = Boolean(process.env.HUD_TEST_MODE);
@@ -1631,6 +1672,17 @@ if (args.length > 0) {
         } catch (_) {}
       }
 
+      if (currentCredits === null && !isTestMode) {
+        const autoDetected = extractCreditsFromVscdb();
+        if (autoDetected !== null) {
+          currentCredits = autoDetected;
+          updatedAt = Date.now();
+          const cDir = path.dirname(creditsCacheFile);
+          if (!fs.existsSync(cDir)) fs.mkdirSync(cDir, { recursive: true });
+          fs.writeFileSync(creditsCacheFile, JSON.stringify({ credits: currentCredits, updatedAt }), 'utf8');
+        }
+      }
+
       if (currentCredits !== null && currentCredits !== undefined) {
         const formatted = typeof currentCredits === 'number' ? `${currentCredits.toLocaleString()} Credits` : String(currentCredits);
         const dateStr = updatedAt ? new Date(updatedAt).toLocaleString() : 'Unknown';
@@ -1645,8 +1697,23 @@ if (args.length > 0) {
 
       console.log('\x1b[90mUsage:\x1b[0m');
       console.log('  hud credits <amount>        Set credit balance (e.g. `hud credits 2348` or `hud credits $15.50`)');
+      console.log('  hud credits sync            Auto-sync credit balance from local Antigravity state');
       console.log('  hud credits clear           Clear cached credit balance');
       console.log('  hud toggle credits          Toggle credits item in your HUD');
+      process.exit(0);
+    }
+
+    if (rawVal.toLowerCase() === 'sync') {
+      const syncedVal = extractCreditsFromVscdb();
+      if (syncedVal !== null) {
+        const cDir = path.dirname(creditsCacheFile);
+        if (!fs.existsSync(cDir)) fs.mkdirSync(cDir, { recursive: true });
+        fs.writeFileSync(creditsCacheFile, JSON.stringify({ credits: syncedVal, updatedAt: Date.now() }), 'utf8');
+        const disp = typeof syncedVal === 'number' ? `${syncedVal.toLocaleString()} Credits` : String(syncedVal);
+        console.log(`\x1b[32m✔ Synchronized model credits from local Antigravity state:\x1b[0m \x1b[38;2;245;169;127m💳 ${disp}\x1b[0m`);
+      } else {
+        console.log('\x1b[33mℹ No model credits found in local Antigravity state. You can set manually via `hud credits <amount>`.\x1b[0m');
+      }
       process.exit(0);
     }
 

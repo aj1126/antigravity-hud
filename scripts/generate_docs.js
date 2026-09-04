@@ -234,10 +234,10 @@ const CLI_COMMANDS = [
     cmd: 'hud credits',
     category: 'Configurator & Utilities',
     aliases: ['hud-credits', 'hud credit'],
-    args: '[amount|clear]',
-    description: 'View current Model AI Credits balance or set a new credit amount locally (zero-quota overhead).',
+    args: '[amount|clear|sync]',
+    description: 'View current Model AI Credits balance, auto-sync from local Antigravity state, or set a new credit amount locally (zero-quota overhead).',
     example: 'hud credits 2348',
-    notes: 'Caches balance indefinitely in `~/.gemini/tmp/last_credits.json` with zero API quota overhead, automatically activating vibrant amber `[0Q Active]` alert styling on Line 2 when 5h quota hits 0%.'
+    notes: 'Caches balance indefinitely in `~/.gemini/tmp/last_credits.json` with zero API quota overhead, automatically activating vibrant amber `[0Q Active]` alert styling when 5h quota hits 0%.'
   },
   {
     cmd: 'hud help',

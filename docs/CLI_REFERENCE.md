@@ -203,11 +203,11 @@ All subcommands are accessible via `hud <command>`, `agy-hud <command>`, or `nod
 
 ### `hud credits`
 
-* **Description:** View current Model AI Credits balance or set a new credit amount locally (zero-quota overhead).
-* **Arguments:** `[amount|clear]`
+* **Description:** View current Model AI Credits balance, auto-sync from local Antigravity state, or set a new credit amount locally (zero-quota overhead).
+* **Arguments:** `[amount|clear|sync]`
 * **Aliases:** `hud-credits`, `hud credit`
 * **Example:** `hud credits 2348`
-* **Notes:** Caches balance indefinitely in `~/.gemini/tmp/last_credits.json` with zero API quota overhead, automatically activating vibrant amber `[0Q Active]` alert styling on Line 2 when 5h quota hits 0%.
+* **Notes:** Caches balance indefinitely in `~/.gemini/tmp/last_credits.json` with zero API quota overhead, automatically activating vibrant amber `[0Q Active]` alert styling when 5h quota hits 0%.
 
 ### `hud help`
 

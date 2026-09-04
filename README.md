@@ -137,7 +137,7 @@ For detailed guides, architectural specifications, and full schemas:
 | `hud gui` | Launch native Windows Forms interactive statusline layout configurator. | `hud gui` |
 | `hud edit` | Open `hud_config.json` in default system text editor (VS Code, Notepad). | `hud edit` |
 | `hud reset` | Reset statusline configuration back to factory default 4-Line Command Center layout. | `hud reset` |
-| `hud credits` | View current Model AI Credits balance or set a new credit amount locally (zero-quota overhead). | `hud credits 2348` |
+| `hud credits` | View current Model AI Credits balance, auto-sync from local Antigravity state, or set a new credit amount locally (zero-quota overhead). | `hud credits 2348` |
 | `hud help` | Print complete formatted CLI command manual with colored examples. | `hud help` |
 
 <!-- AUTO-DOC:CLI_TABLE:END -->

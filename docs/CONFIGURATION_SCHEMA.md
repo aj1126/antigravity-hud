@@ -16,13 +16,13 @@ The Antigravity HUD configuration is stored in JSON format at `~/.gemini/scripts
     "workspace",
     "model",
     "state",
-    "tasks"
+    "tasks",
+    "credits"
   ],
   "line2": [
     "context",
     "quota_5h",
     "quota_weekly",
-    "credits",
     "git_status"
   ],
   "line3": [
