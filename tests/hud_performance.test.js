@@ -10,7 +10,7 @@ const assert = require('assert');
 const { execSync, spawnSync } = require('child_process');
 
 const repoRoot = path.resolve(__dirname, '..');
-const hudJs = path.join(repoRoot, 'bin', 'hud.js');
+const hudJs = [path.join(repoRoot, 'bin', 'hud.js'), path.join(repoRoot, 'hud.js')].find(p => fs.existsSync(p));
 const mockPayloadPath = path.join(repoRoot, 'tests', 'fixtures', 'mock_live_payload.json');
 const mockPayload = fs.readFileSync(mockPayloadPath, 'utf8');
 

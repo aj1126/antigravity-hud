@@ -2339,6 +2339,32 @@ function getPlanTierSegment(payload, style = 'full') {
   return `\x1b[35m✨ ${tierName}\x1b[0m`;
 }
 
+function getLocalAiSegment(payload, style = 'full') {
+  let status = payload.local_ai_status || payload.ollama_status || 'ready';
+  let modelName = payload.local_ai_model || 'Qwen 3B';
+
+  const isTestMode = Boolean(process.env.HUD_TEST_MODE || payload.is_test);
+  const cacheFile = path.join(homeDir, '.gemini', 'tmp', 'last_local_ai.json');
+
+  if (!isTestMode && fs.existsSync(cacheFile)) {
+    try {
+      const cached = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+      if (Date.now() - cached.updatedAt < 60000) {
+        status = cached.status || status;
+        modelName = cached.model || modelName;
+      }
+    } catch (_) {}
+  }
+
+  if (style === 'minimal') {
+    return '\x1b[36m⚡\x1b[0m';
+  } else if (style === 'short') {
+    return `\x1b[36m⚡ ${modelName}\x1b[0m`;
+  }
+  const formattedStatus = status.charAt(0).toUpperCase() + status.slice(1);
+  return `\x1b[36m⚡ ${modelName} (${formattedStatus})\x1b[0m`;
+}
+
 function getSessionUptime(payload) {
   if (typeof payload.session_duration_seconds === 'number' && payload.session_duration_seconds > 0) {
     return payload.session_duration_seconds;
@@ -2710,6 +2736,13 @@ process.stdin.on('end', () => {
       planTierSegment = getPlanTierSegment(payload, stPlan);
     }
 
+    // 14. Local AI Telemetry
+    let localAiSegment = '';
+    if (activeItemSet.has('local_ai') || activeItemSet.has('ai') || activeItemSet.has('ollama') || activeItemSet.has('qwen')) {
+      const stAi = resolveItemStyle('local_ai', cfg, width);
+      localAiSegment = getLocalAiSegment(payload, stAi);
+    }
+
     // Item Map
     const itemMap = {
       workspace: wsSegment,
@@ -2728,6 +2761,10 @@ process.stdin.on('end', () => {
       credits: creditsSegment,
       plan_tier: planTierSegment,
       plan: planTierSegment,
+      local_ai: localAiSegment,
+      ai: localAiSegment,
+      ollama: localAiSegment,
+      qwen: localAiSegment,
       mcp: mcpSegment,
       tasks: taskSegment,
       subagents: subagentSegment,

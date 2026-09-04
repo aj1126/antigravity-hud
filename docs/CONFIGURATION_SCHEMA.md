@@ -15,41 +15,42 @@ The Antigravity HUD configuration is stored in JSON format at `~/.gemini/scripts
   "line1": [
     "workspace",
     "model",
-    "state"
+    "state",
+    "tasks"
   ],
   "line2": [
     "context",
     "quota_5h",
-    "quota_weekly"
+    "quota_weekly",
+    "git_status"
   ],
   "line3": [
-    "mcp",
-    "tasks",
-    "subagents",
     "artifacts",
     "queue",
-    "git_status"
+    "subagents",
+    "mcp",
+    "fork"
   ],
   "line4": [
     "sandbox",
-    "auth",
-    "session",
-    "fork"
+    "auth"
   ],
-  "disabled": [],
+  "disabled": [
+    "session"
+  ],
   "item_styles": {},
   "session_uptime": {
     "show_seconds": true
   },
   "fork_advisory": {
-    "enabled": true,
-    "warning_percent": 60,
-    "step_alert": 500,
-    "step_warning": 300,
-    "require_clean_git": true,
-    "critical_percent": 90,
     "alert_percent": 75,
-    "step_critical": 800
+    "critical_percent": 90,
+    "require_clean_git": true,
+    "step_alert": 500,
+    "step_critical": 800,
+    "step_warning": 300,
+    "warning_percent": 60,
+    "enabled": true
   }
 }
 ```

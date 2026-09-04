@@ -13,7 +13,8 @@
     "context",
     "fork",
     "quota_5h",
-    "quota_weekly"
+    "quota_weekly",
+    "credits"
   ],
   "line3": [
     "mcp",
@@ -27,7 +28,9 @@
     "sandbox",
     "session"
   ],
-  "disabled": [],
+  "disabled": [
+    "plan_tier"
+  ],
   "item_styles": {
     "workspace": "full",
     "model": "short",

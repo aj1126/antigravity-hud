@@ -8,7 +8,11 @@ const path = require('path');
 const assert = require('assert');
 const { execSync } = require('child_process');
 
-const repoRoot = path.resolve(__dirname, '..');
+const candidateRepoRoots = [
+  path.resolve(__dirname, '..'),
+  path.join('B:', 'Repos', 'antigravity-hud')
+];
+const repoRoot = candidateRepoRoots.find(p => fs.existsSync(path.join(p, 'docs')) && fs.existsSync(path.join(p, 'scripts', 'generate_docs.js'))) || path.resolve(__dirname, '..');
 const docsDir = path.join(repoRoot, 'docs');
 const readmePath = path.join(repoRoot, 'README.md');
 const generateDocsScript = path.join(repoRoot, 'scripts', 'generate_docs.js');
