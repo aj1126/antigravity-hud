@@ -1612,6 +1612,64 @@ if (args.length > 0) {
     process.exit(0);
   }
 
+  if (cmd === 'credits' || cmd === 'credit') {
+    const rawVal = args.slice(1).join(' ').trim();
+    const creditsCacheFile = path.join(homeDir, '.gemini', 'tmp', 'last_credits.json');
+
+    if (!rawVal) {
+      console.log('\x1b[1m\x1b[36m=== AGY HUD: Model AI Credits Telemetry ===\x1b[0m\n');
+      let currentCredits = null;
+      let updatedAt = null;
+      if (fs.existsSync(creditsCacheFile)) {
+        try {
+          const cached = JSON.parse(fs.readFileSync(creditsCacheFile, 'utf8'));
+          currentCredits = cached.credits;
+          updatedAt = cached.updatedAt;
+        } catch (_) {}
+      }
+
+      if (currentCredits !== null && currentCredits !== undefined) {
+        const formatted = typeof currentCredits === 'number' ? `${currentCredits.toLocaleString()} Credits` : String(currentCredits);
+        const dateStr = updatedAt ? new Date(updatedAt).toLocaleString() : 'Unknown';
+        console.log(`  Current Balance:     \x1b[38;2;245;169;127m💳 ${formatted}\x1b[0m`);
+        console.log(`  Last Updated:        \x1b[90m${dateStr}\x1b[0m`);
+        console.log(`  Cache File:          \x1b[90m${creditsCacheFile}\x1b[0m`);
+        console.log(`  Zero-Quota Status:   \x1b[32mActive (Ready for quota fallback)\x1b[0m\n`);
+      } else {
+        console.log('  Current Balance:     \x1b[33m[NONE DETECTED]\x1b[0m');
+        console.log('  Cache File:          \x1b[90m' + creditsCacheFile + '\x1b[0m\n');
+      }
+
+      console.log('\x1b[90mUsage:\x1b[0m');
+      console.log('  hud credits <amount>        Set credit balance (e.g. `hud credits 2348` or `hud credits $15.50`)');
+      console.log('  hud credits clear           Clear cached credit balance');
+      console.log('  hud toggle credits          Toggle credits item in your HUD');
+      process.exit(0);
+    }
+
+    if (rawVal.toLowerCase() === 'clear' || rawVal.toLowerCase() === 'reset') {
+      if (fs.existsSync(creditsCacheFile)) {
+        try { fs.unlinkSync(creditsCacheFile); } catch (_) {}
+      }
+      console.log('\x1b[32m✔ Cleared cached model credits balance.\x1b[0m');
+      process.exit(0);
+    }
+
+    let parsedVal = rawVal;
+    const cleanNum = rawVal.replace(/[^0-9.]/g, '');
+    if (cleanNum && !isNaN(Number(cleanNum)) && !rawVal.includes('$')) {
+      parsedVal = Number(cleanNum);
+    }
+
+    const cDir = path.dirname(creditsCacheFile);
+    if (!fs.existsSync(cDir)) fs.mkdirSync(cDir, { recursive: true });
+    fs.writeFileSync(creditsCacheFile, JSON.stringify({ credits: parsedVal, updatedAt: Date.now() }), 'utf8');
+
+    const disp = typeof parsedVal === 'number' ? `${parsedVal.toLocaleString()} Credits` : String(parsedVal);
+    console.log(`\x1b[32m✔ Model credits balance set to:\x1b[0m \x1b[38;2;245;169;127m💳 ${disp}\x1b[0m`);
+    process.exit(0);
+  }
+
   if (cmd === 'help' || cmd === 'h' || cmd === '?' || cmd === '/?') {
     console.log('\x1b[1m\x1b[36m=======================================================\x1b[0m');
     console.log('\x1b[1m\x1b[36m        Antigravity CLI (AGY) Statusline HUD Help      \x1b[0m');
@@ -1624,6 +1682,7 @@ if (args.length > 0) {
     console.log('  \x1b[33mhud compact <mode>\x1b[0m            Set global compact mode (auto, full, short, minimal)');
     console.log('  \x1b[33mhud style <item> <style>\x1b[0m      Set item format style (full, short, minimal, auto)');
     console.log('  \x1b[33mhud style reset\x1b[0m               Reset all per-item styles to auto');
+    console.log('  \x1b[33mhud credits [amount]\x1b[0m          View or set Model AI Credits balance');
     console.log('  \x1b[33mhud title <name>\x1b[0m              Set custom session and tab title (/title)');
     console.log('  \x1b[33mhud title reset\x1b[0m               Reset session and tab title to default');
     console.log('  \x1b[33mhud gui\x1b[0m                       Launch interactive Drag-and-Drop Web GUI');
@@ -1651,6 +1710,8 @@ if (args.length > 0) {
     console.log('  • \x1b[32mfork\x1b[0m          🍴 Milestone & step fork advisory badge (snoozeable)');
     console.log('  • \x1b[32mquota_5h\x1b[0m      Quota: 5-hour reserve % & reset countdown');
     console.log('  • \x1b[32mquota_weekly\x1b[0m  Wk: weekly quota reserve %');
+    console.log('  • \x1b[32mcredits\x1b[0m       💳 Model AI Credits & Zero-Quota balance');
+    console.log('  • \x1b[32mplan_tier\x1b[0m     ✨ Account Subscription Plan Tier');
     console.log('  • \x1b[32mmcp\x1b[0m           🔌 Active MCP server count');
     console.log('  • \x1b[32msubagents\x1b[0m     🤖 Live subagent counters');
     console.log('  • \x1b[32mtasks\x1b[0m         ⚙️ Running background tasks');
@@ -2229,10 +2290,11 @@ function getQuotaSegments(payload, style5h = 'full', styleWk = 'full') {
     quotaWkSegment = `Wk: ${col}${val}%\x1b[0m`;
   }
 
-  return { quota5hSegment, quotaWkSegment };
+  const isZeroQuota = (q5hPercent !== null && Math.round(q5hPercent) === 0) || (qWkPercent !== null && Math.round(qWkPercent) === 0);
+  return { quota5hSegment, quotaWkSegment, isZeroQuota, q5hPercent, qWkPercent };
 }
 
-function getCreditsSegment(payload, style = 'full') {
+function getCreditsSegment(payload, style = 'full', isZeroQuota = false) {
   let creditsVal = null;
   let creditsUnit = 'cred';
 
@@ -2270,7 +2332,7 @@ function getCreditsSegment(payload, style = 'full') {
   } else if (!isTestMode && creditsVal === null && fs.existsSync(creditsCacheFile)) {
     try {
       const cached = JSON.parse(fs.readFileSync(creditsCacheFile, 'utf8'));
-      if (Date.now() - cached.updatedAt < 7 * 24 * 3600 * 1000) {
+      if (cached && (typeof cached.credits === 'number' || typeof cached.credits === 'string')) {
         creditsVal = cached.credits;
       }
     } catch (_) {}
@@ -2291,9 +2353,11 @@ function getCreditsSegment(payload, style = 'full') {
     displayStr = String(creditsVal);
   }
 
-  if (style === 'minimal') {
-    return `\x1b[38;2;245;169;127m💳 ${displayStr}\x1b[0m`;
+  if (isZeroQuota) {
+    const alertTag = style === 'full' ? ' [0Q Active]' : (style === 'short' ? ' [0Q]' : '');
+    return `\x1b[38;2;255;165;0m\x1b[1m💳 ${displayStr}${alertTag}\x1b[0m`;
   }
+
   return `\x1b[38;2;245;169;127m💳 ${displayStr}\x1b[0m`;
 }
 
@@ -2557,12 +2621,17 @@ process.stdin.on('end', () => {
     // 5. Dual Quotas (5-Hour Rolling & Weekly)
     let quota5hSegment = '';
     let quotaWkSegment = '';
+    let isZeroQuota = false;
     if (activeItemSet.has('quota_5h') || activeItemSet.has('quota_weekly') || activeItemSet.has('quota')) {
       const stQ5h = resolveItemStyle('quota_5h', cfg, width);
       const stQwk = resolveItemStyle('quota_weekly', cfg, width);
       const qRes = getQuotaSegments(payload, stQ5h, stQwk);
       quota5hSegment = qRes.quota5hSegment;
       quotaWkSegment = qRes.quotaWkSegment;
+      isZeroQuota = Boolean(qRes.isZeroQuota);
+    } else if (activeItemSet.has('credits')) {
+      const qRes = getQuotaSegments(payload);
+      isZeroQuota = Boolean(qRes.isZeroQuota);
     }
 
     // 6. MCP Servers
@@ -2727,7 +2796,7 @@ process.stdin.on('end', () => {
     let creditsSegment = '';
     if (activeItemSet.has('credits')) {
       const stCred = resolveItemStyle('credits', cfg, width);
-      creditsSegment = getCreditsSegment(payload, stCred);
+      creditsSegment = getCreditsSegment(payload, stCred, isZeroQuota);
     }
 
     let planTierSegment = '';

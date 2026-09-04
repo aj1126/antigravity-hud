@@ -16,6 +16,7 @@
     "context",
     "quota_5h",
     "quota_weekly",
+    "credits",
     "mcp",
     "tasks",
     "artifacts"

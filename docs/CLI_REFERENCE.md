@@ -201,6 +201,14 @@ All subcommands are accessible via `hud <command>`, `agy-hud <command>`, or `nod
 * **Example:** `hud reset`
 * **Notes:** Overwrites `hud_config.json` with canonical default settings.
 
+### `hud credits`
+
+* **Description:** View current Model AI Credits balance or set a new credit amount locally (zero-quota overhead).
+* **Arguments:** `[amount|clear]`
+* **Aliases:** `hud-credits`, `hud credit`
+* **Example:** `hud credits 2348`
+* **Notes:** Caches balance indefinitely in `~/.gemini/tmp/last_credits.json` with zero API quota overhead, automatically activating vibrant amber `[0Q Active]` alert styling on Line 2 when 5h quota hits 0%.
+
 ### `hud help`
 
 * **Description:** Print complete formatted CLI command manual with colored examples.

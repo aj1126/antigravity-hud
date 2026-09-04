@@ -14,7 +14,8 @@
   "line2": [
     "context",
     "quota_5h",
-    "quota_weekly"
+    "quota_weekly",
+    "credits"
   ],
   "line3": [
     "mcp",

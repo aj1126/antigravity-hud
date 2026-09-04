@@ -228,6 +228,51 @@ runTest('Engine: empty stdio fallback produces ready state without crash', () =>
   assert(res.stdout.length > 0);
 });
 
+// 13. Model Credits CLI Subcommands & Zero-Quota Cache Management
+runTest('CLI: hud credits sets, reads, and clears balance', () => {
+  // Set credits balance
+  let res = spawnSync('node', [hudScriptPath, 'credits', '3500'], { env, encoding: 'utf8' });
+  assert.strictEqual(res.status, 0);
+  assert(res.stdout.includes('Model credits balance set to:'));
+  assert(res.stdout.includes('3,500 Credits'));
+
+  // Inspect credits balance
+  res = spawnSync('node', [hudScriptPath, 'credits'], { env, encoding: 'utf8' });
+  assert.strictEqual(res.status, 0);
+  assert(res.stdout.includes('3,500 Credits'));
+  assert(res.stdout.includes('Zero-Quota Status:'));
+
+  // Clear credits balance
+  res = spawnSync('node', [hudScriptPath, 'credits', 'clear'], { env, encoding: 'utf8' });
+  assert.strictEqual(res.status, 0);
+  assert(res.stdout.includes('Cleared cached model credits balance'));
+});
+
+// 14. Zero-Quota Alert Highlighting
+runTest('Engine: zero-quota conditions apply alert highlight to credits segment', () => {
+  const payloadStr = fs.readFileSync(fixturePayloadPath, 'utf8');
+  const payload = JSON.parse(payloadStr);
+  payload.quota = {
+    five_hour_percent: 0,
+    weekly_percent: 0
+  };
+  payload.credits = 1850;
+  payload.g1_credits = 1850;
+  payload.model_credits = 1850;
+
+  // Render in full mode
+  fs.copyFileSync(fixtureCfgPath, testConfigPath);
+  const res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env,
+    encoding: 'utf8'
+  });
+  assert.strictEqual(res.status, 0);
+  assert(res.stdout.includes('[0Q Active]'), 'Expected [0Q Active] tag when quota is 0');
+  const clean = stripAnsi(res.stdout);
+  assert(clean.includes('💳 1,850 Credits [0Q Active]'), 'Expected formatted zero-quota alert string');
+});
+
 // Cleanup test scratch
 try {
   fs.rmSync(tempTestDir, { recursive: true, force: true });
