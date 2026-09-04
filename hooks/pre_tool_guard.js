@@ -44,7 +44,7 @@ function evaluateCommand(cmd) {
   if (fs.existsSync(quotaFile)) {
     try {
       const quota = JSON.parse(fs.readFileSync(quotaFile, 'utf8'));
-      const percentLeft = quota.percent_remaining ?? quota.remaining_percentage;
+      const percentLeft = quota.q5hPercent ?? quota.percent_remaining ?? quota.remaining_percentage;
       if (typeof percentLeft === 'number' && percentLeft < 15) {
         quotaWarning = `Quota Low (${percentLeft}% remaining). Suggest reasoning effort adjustment (/effort low).`;
       }
