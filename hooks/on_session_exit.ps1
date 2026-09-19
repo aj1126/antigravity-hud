@@ -114,11 +114,13 @@ try {
     $knowledgeDevLog = Join-Path $HomeDir ".gemini\antigravity\knowledge\DEVELOPER_LOG.md"
 
     if (Test-Path $repoDevLog) {
-        if ((Resolve-Path $repoDevLog).Path -ne (Resolve-Path $globalDevLog -ErrorAction SilentlyContinue)?.Path) {
-            Copy-Item $repoDevLog $globalDevLog -Force -ErrorAction SilentlyContinue
-        }
-        if ((Resolve-Path $repoDevLog).Path -ne (Resolve-Path $knowledgeDevLog -ErrorAction SilentlyContinue)?.Path) {
-            Copy-Item $repoDevLog $knowledgeDevLog -Force -ErrorAction SilentlyContinue
+        if (-not $TestMode) {
+            if ((Resolve-Path $repoDevLog).Path -ne (Resolve-Path $globalDevLog -ErrorAction SilentlyContinue)?.Path) {
+                Copy-Item $repoDevLog $globalDevLog -Force -ErrorAction SilentlyContinue
+            }
+            if ((Resolve-Path $repoDevLog).Path -ne (Resolve-Path $knowledgeDevLog -ErrorAction SilentlyContinue)?.Path) {
+                Copy-Item $repoDevLog $knowledgeDevLog -Force -ErrorAction SilentlyContinue
+            }
         }
         $statusRecord.QuadSyncVerified = $true
     }
