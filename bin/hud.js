@@ -1778,8 +1778,8 @@ if (args.length > 0) {
     console.log('  • \x1b[32msession\x1b[0m       ⏱️ Live session duration & uptime');
     console.log('  • \x1b[32mcontext\x1b[0m       Ctx: progress bar, % used & prompt cache rate');
     console.log('  • \x1b[32mfork\x1b[0m          🍴 Milestone & step fork advisory badge (snoozeable)');
-    console.log('  • \x1b[32mquota_5h\x1b[0m      Quota: 5-hour reserve % & reset date/time');
-    console.log('  • \x1b[32mquota_weekly\x1b[0m  Wk: weekly quota reserve %');
+    console.log('  • \x1b[32mquota_5h\x1b[0m      Quota: 5-hour reserve % & reset time');
+    console.log('  • \x1b[32mquota_weekly\x1b[0m  Wk: weekly quota reserve % & reset date/time');
     console.log('  • \x1b[32mcredits\x1b[0m       💳 Model AI Credits & Zero-Quota balance');
     console.log('  • \x1b[32mplan_tier\x1b[0m     ✨ Account Subscription Plan Tier');
     console.log('  • \x1b[32mmcp\x1b[0m           🔌 Active MCP server count');
@@ -2204,7 +2204,7 @@ function formatTimer(seconds, style = 'full') {
   return `${mins}m`;
 }
 
-function formatResetDateTime(target, style = 'full') {
+function formatResetDateTime(target, includeDate = false, style = 'full') {
   if (!target) return '';
   const d = target instanceof Date ? target : (typeof target === 'number' && target > 100000000000 ? new Date(target) : new Date(Date.now() + Number(target) * 1000));
   if (isNaN(d.getTime())) return '';
@@ -2215,9 +2215,13 @@ function formatResetDateTime(target, style = 'full') {
                     d.getMonth() === now.getMonth() &&
                     d.getFullYear() === now.getFullYear();
 
-  if (style === 'minimal') {
-    return isSameDay ? timeStr : `${d.getMonth() + 1}/${d.getDate()} ${timeStr}`;
+  if (!includeDate) {
+    if (isSameDay) return timeStr;
+    const dayDiff = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000);
+    if (dayDiff === 1) return `Tomorrow ${timeStr}`;
+    return `${d.getMonth() + 1}/${d.getDate()} ${timeStr}`;
   }
+
   if (style === 'short') {
     return `${d.getMonth() + 1}/${d.getDate()} ${timeStr}`;
   }
@@ -2353,6 +2357,11 @@ function getQuotaSegments(payload, style5h = 'full', styleWk = 'full') {
           q5hReset = Math.max(0, remaining);
         }
         if (qWkPercent === null) qWkPercent = cached.qWkPercent;
+        if (qWkReset === null && (cached.qWkReset || cached.qWkResetAt)) {
+          const resetAt = cached.qWkResetAt || (cached.updatedAt + cached.qWkReset * 1000);
+          const remaining = Math.floor((resetAt - Date.now()) / 1000);
+          qWkReset = Math.max(0, remaining);
+        }
       }
     } catch (_) {}
   }
@@ -2364,7 +2373,7 @@ function getQuotaSegments(payload, style5h = 'full', styleWk = 'full') {
     if (val < 20) col = '\x1b[31m';
     else if (val < 50) col = '\x1b[33m';
 
-    const resetTime = q5hReset && q5hReset > 0 ? ` (↻ ${formatResetDateTime(q5hReset, style5h)})` : '';
+    const resetTime = q5hReset && q5hReset > 0 ? ` (↻ ${formatResetDateTime(q5hReset, false, style5h)})` : '';
     if (style5h === 'minimal') {
       quota5hSegment = `5h: ${col}${val}%\x1b[0m`;
     } else if (style5h === 'short') {
@@ -2381,7 +2390,12 @@ function getQuotaSegments(payload, style5h = 'full', styleWk = 'full') {
     if (val < 20) col = '\x1b[31m';
     else if (val < 50) col = '\x1b[33m';
 
-    quotaWkSegment = `Wk: ${col}${val}%\x1b[0m`;
+    const resetWkTime = qWkReset && qWkReset > 0 ? ` (↻ ${formatResetDateTime(qWkReset, true, styleWk)})` : '';
+    if (styleWk === 'minimal') {
+      quotaWkSegment = `Wk: ${col}${val}%\x1b[0m`;
+    } else {
+      quotaWkSegment = `Wk: ${col}${val}%\x1b[0m${resetWkTime}`;
+    }
   }
 
   const isZeroQuota = (q5hPercent !== null && Math.round(q5hPercent) === 0) || (qWkPercent !== null && Math.round(qWkPercent) === 0);
