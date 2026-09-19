@@ -1,5 +1,23 @@
 # Developer Log - Antigravity HUD (`antigravity-hud`)
 
+## Session Milestone: 2026-09-19
+* **Branch**: `feat/quota-reset-datetime`
+* **Status**: Complete & Verified (Quota Reset Date/Time Display & Granular Window Formatting)
+
+---
+
+### [SESSION LOG: 2026-09-19 - Quota Reset Date/Time Display Formatting]
+* **Completed Objectives:**
+  - Enhanced quota reset presentation in `bin/hud.js` to render exact reset timestamps rather than duration-only relative intervals (`in 3h 48m`).
+  - Implemented window-aware date/time formatting:
+    - **Hourly / 5-hour window**: Localized time only (e.g. `Quota: 86% (↻ 7:46 PM)`), preserving compact layout and visual simplicity.
+    - **Weekly window**: Localized short date and time (e.g. `Wk: 64% (↻ Sep 26 3:52 AM)`), providing exact day and time visibility for the long reset cycle.
+  - Implemented robust `formatResetDate(isoString, includeDate)` helper using `Date.toLocaleTimeString()` and `Date.toLocaleDateString()` with fallback regex parsing for edge-case formats.
+  - Synchronized across runtime targets: `~/.gemini/scripts/hud.js`, `~/.gemini/hud/hud.js`, and `B:\Repos\antigravity-hud\bin\hud.js` (SHA256 verified identical).
+  - Verified live render: `Quota: 86% (↻ 7:46 PM) │ Wk: 64% (↻ Sep 26 3:52 AM)`.
+
+---
+
 ## Session Milestone: 2026-09-04
 * **Branch**: `main`
 * **Status**: Complete & Verified (Zero-Quota Model Credits Telemetry & Dynamic 0Q Alert Integration)

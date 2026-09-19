@@ -16,8 +16,7 @@ The Antigravity HUD configuration is stored in JSON format at `~/.gemini/scripts
     "workspace",
     "model",
     "state",
-    "tasks",
-    "credits"
+    "tasks"
   ],
   "line2": [
     "context",
@@ -37,39 +36,22 @@ The Antigravity HUD configuration is stored in JSON format at `~/.gemini/scripts
     "auth"
   ],
   "disabled": [
-    "session"
+    "session",
+    "credits"
   ],
   "item_styles": {},
   "session_uptime": {
-    "show_seconds": true,
-    "thresholds": [
-      {
-        "max_minutes": 15,
-        "color": "green"
-      },
-      {
-        "max_minutes": 45,
-        "color": "yellow"
-      },
-      {
-        "max_minutes": 90,
-        "color": "magenta"
-      },
-      {
-        "max_minutes": null,
-        "color": "red"
-      }
-    ]
+    "show_seconds": true
   },
   "fork_advisory": {
-    "enabled": true,
-    "require_clean_git": true,
-    "warning_percent": 60,
-    "alert_percent": 75,
-    "critical_percent": 90,
     "step_warning": 300,
-    "step_alert": 500,
-    "step_critical": 800
+    "warning_percent": 60,
+    "critical_percent": 90,
+    "step_critical": 800,
+    "require_clean_git": true,
+    "alert_percent": 75,
+    "enabled": true,
+    "step_alert": 500
   }
 }
 ```
