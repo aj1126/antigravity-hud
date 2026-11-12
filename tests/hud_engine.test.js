@@ -132,7 +132,7 @@ runTest('CLI: hud toggle, enable, disable items', () => {
 runTest('CLI: hud title sets custom title and clears on reset', () => {
   let res = spawnSync('node', [hudScriptPath, 'title', 'Feature Test Branch'], { env, encoding: 'utf8' });
   assert.strictEqual(res.status, 0);
-  assert(res.stdout.includes('\x1b]0;[agy] Feature Test Branch\x07'), 'Expected OSC 0 sequence');
+  assert(res.stdout.includes('\x1b]0;\u{1FA90} agy - Feature Test Branch\x07'), 'Expected OSC 0 sequence');
 
   res = spawnSync('node', [hudScriptPath, 'title', 'reset'], { env, encoding: 'utf8' });
   assert.strictEqual(res.status, 0);
@@ -151,7 +151,7 @@ runTest('Engine: stdio pipeline renders 4-line telemetry with mock payload', () 
     encoding: 'utf8'
   });
   assert.strictEqual(res.status, 0);
-  assert(res.stdout.includes('\x1b]0;[agy] '), 'Must emit OSC 0 tab title');
+  assert(res.stdout.includes('\x1b]0;\u{1FA90} agy - '), 'Must emit OSC 0 tab title');
   const lines = res.stdout.replace(/^\x1b\]0;[^\x07]+\x07/, '').split('\n');
   assert.strictEqual(lines.length, 4, `Expected 4 rendered lines, got ${lines.length}`);
   
@@ -271,6 +271,169 @@ runTest('Engine: zero-quota conditions apply alert highlight to credits segment'
   assert(res.stdout.includes('[0Q Active]'), 'Expected [0Q Active] tag when quota is 0');
   const clean = stripAnsi(res.stdout);
   assert(clean.includes('💳 1,850 Credits [0Q Active]'), 'Expected formatted zero-quota alert string');
+});
+
+// 15. Gemini 4 Argon Model Badges, Dual Weekly Quota Wk(A)/Wk(F), Cache Isolation & Active-Model 0Q
+runTest('Engine: Gemini 4 Argon renders full/short/minimal badges, dual Wk(A)/Wk(F) quota, and active-model 0Q', () => {
+  const payloadStr = fs.readFileSync(fixturePayloadPath, 'utf8');
+  const payload = JSON.parse(payloadStr);
+  payload.model = {
+    id: 'gemini-4-argon',
+    display_name: 'Gemini 4 Argon (High)'
+  };
+  payload.rate_limits = {
+    'gemini-5h': { remaining_percentage: 100, reset_in_seconds: 18000 },
+    'gemini-argon-wtu-weekly': { remaining_percentage: 64, reset_in_seconds: 182700 },
+    'gemini-weekly': { remaining_percentage: 100, reset_in_seconds: 604800 }
+  };
+  delete payload.quota;
+  payload.credits = 2000;
+
+  const testQuotaCache = path.join(tempTestDir, 'test_argon_last_quota.json');
+  const envWithQuotaFile = Object.assign({}, env, { HUD_TEST_QUOTA_FILE: testQuotaCache });
+
+  // 15a. Full mode
+  const fullCfg = JSON.parse(fs.readFileSync(fixtureCfgPath, 'utf8'));
+  fullCfg.item_styles = Object.assign({}, fullCfg.item_styles, { model: 'full' });
+  fs.writeFileSync(testConfigPath, JSON.stringify(fullCfg, null, 2), 'utf8');
+  let res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  assert.strictEqual(res.status, 0);
+  let clean = stripAnsi(res.stdout);
+  assert(clean.includes('Gemini 4 Argon [🧠 HIGH]'), `Expected full Argon badge, got: ${clean}`);
+  assert(clean.includes('Wk(A): 64% / Wk(F): 100%'), `Expected dual Wk(A)/Wk(F) segment, got: ${clean}`);
+  assert(!clean.includes('[0Q Active]'), 'Should not trigger 0Q when Argon weekly is 64%');
+
+  // Verify HUD_TEST_QUOTA_FILE persisted dual weekly fields
+  assert(fs.existsSync(testQuotaCache), 'HUD_TEST_QUOTA_FILE should be written');
+  const cachedQuota = JSON.parse(fs.readFileSync(testQuotaCache, 'utf8'));
+  assert.strictEqual(cachedQuota.qArgonWkPercent, 64);
+  assert.strictEqual(cachedQuota.qFlashWkPercent, 100);
+
+  // 15b. Short mode -> Argon [HI]
+  const shortCfg = JSON.parse(fs.readFileSync(fixtureCfgPath, 'utf8'));
+  shortCfg.item_styles = Object.assign({}, shortCfg.item_styles, { model: 'short' });
+  fs.writeFileSync(testConfigPath, JSON.stringify(shortCfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('Argon [HI]'), `Expected short Argon [HI] badge, got: ${clean}`);
+
+  // 15c. Minimal mode -> Argon
+  const minCfg = JSON.parse(fs.readFileSync(fixtureCfgPath, 'utf8'));
+  minCfg.item_styles = Object.assign({}, minCfg.item_styles, { model: 'minimal' });
+  fs.writeFileSync(testConfigPath, JSON.stringify(minCfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('Argon │'), `Expected minimal Argon badge, got: ${clean}`);
+
+  // 15d. Active-model 0Q when Argon weekly is 0% (even though Flash weekly is 100%)
+  fs.copyFileSync(fixtureCfgPath, testConfigPath);
+  payload.rate_limits['gemini-argon-wtu-weekly'].remaining_percentage = 0;
+  res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('[0Q Active]'), 'Expected [0Q Active] when Argon is active and Argon weekly is 0%');
+});
+
+// 16. Gemini 4 Hydrogen Model Badges (incl. XHigh) & Standard/Flash Weekly Quota Binding
+runTest('Engine: Gemini 4 Hydrogen binds to gemini-weekly (not Argon WTU) and renders full/short/minimal badges', () => {
+  const payloadStr = fs.readFileSync(fixturePayloadPath, 'utf8');
+  const payload = JSON.parse(payloadStr);
+  payload.model = {
+    id: 'gemini-4-hydrogen-xhigh',
+    display_name: 'Gemini 4 Hydrogen (XHigh)',
+    effort: 'xhigh'
+  };
+  payload.rate_limits = {
+    'gemini-5h': { remaining_percentage: 100, reset_in_seconds: 18000 },
+    'gemini-argon-wtu-weekly': { remaining_percentage: 100, reset_in_seconds: 604800 },
+    'gemini-weekly': { remaining_percentage: 87, reset_in_seconds: 114390 }
+  };
+  delete payload.quota;
+  payload.credits = 2000;
+
+  const testQuotaCache = path.join(tempTestDir, 'test_hydrogen_last_quota.json');
+  const envWithQuotaFile = Object.assign({}, env, { HUD_TEST_QUOTA_FILE: testQuotaCache });
+
+  // 16a. Full mode + qWkPercent binds to Flash/standard weekly pool (87), not Argon (100)
+  const fullCfg = JSON.parse(fs.readFileSync(fixtureCfgPath, 'utf8'));
+  fullCfg.item_styles = Object.assign({}, fullCfg.item_styles, { model: 'full' });
+  fs.writeFileSync(testConfigPath, JSON.stringify(fullCfg, null, 2), 'utf8');
+  let res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  assert.strictEqual(res.status, 0);
+  let clean = stripAnsi(res.stdout);
+  assert(clean.includes('Gemini 4 Hydrogen [🧠 XHIGH]'), `Expected full Hydrogen badge, got: ${clean}`);
+  assert(clean.includes('Wk(A): 100% / Wk(F): 87%'), `Expected dual Wk(A)/Wk(F) segment, got: ${clean}`);
+  assert(!clean.includes('[0Q Active]'), 'Should not trigger 0Q when Hydrogen/Flash weekly is 87%');
+
+  const cachedQuota = JSON.parse(fs.readFileSync(testQuotaCache, 'utf8'));
+  assert.strictEqual(cachedQuota.qWkPercent, 87, 'Primary qWkPercent for Hydrogen must bind to gemini-weekly (87), not Argon WTU (100)');
+  assert.strictEqual(cachedQuota.qArgonWkPercent, 100);
+  assert.strictEqual(cachedQuota.qFlashWkPercent, 87);
+
+  // 16b. Short mode -> Hydrogen [XHI]
+  const shortCfg = JSON.parse(fs.readFileSync(fixtureCfgPath, 'utf8'));
+  shortCfg.item_styles = Object.assign({}, shortCfg.item_styles, { model: 'short' });
+  fs.writeFileSync(testConfigPath, JSON.stringify(shortCfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('Hydrogen [XHI]'), `Expected short Hydrogen [XHI] badge, got: ${clean}`);
+
+  // 16c. Minimal mode -> Hydrogen
+  const minCfg = JSON.parse(fs.readFileSync(fixtureCfgPath, 'utf8'));
+  minCfg.item_styles = Object.assign({}, minCfg.item_styles, { model: 'minimal' });
+  fs.writeFileSync(testConfigPath, JSON.stringify(minCfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('Hydrogen │'), `Expected minimal Hydrogen badge, got: ${clean}`);
+
+  // 16d. Active-model 0Q does NOT trigger if only Argon WTU is 0%, and DOES trigger when gemini-weekly is 0%
+  fs.copyFileSync(fixtureCfgPath, testConfigPath);
+  payload.rate_limits['gemini-argon-wtu-weekly'].remaining_percentage = 0;
+  payload.rate_limits['gemini-weekly'].remaining_percentage = 87;
+  res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  clean = stripAnsi(res.stdout);
+  assert(!clean.includes('[0Q Active]'), 'Should NOT trigger [0Q Active] for Hydrogen when only Argon WTU is 0%');
+
+  payload.rate_limits['gemini-argon-wtu-weekly'].remaining_percentage = 100;
+  payload.rate_limits['gemini-weekly'].remaining_percentage = 0;
+  res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('[0Q Active]'), 'Expected [0Q Active] for Hydrogen when gemini-weekly is 0%');
 });
 
 // Cleanup test scratch

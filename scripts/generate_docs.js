@@ -277,12 +277,12 @@ const TELEMETRY_ITEMS = [
     key: 'model',
     category: 'Identity & Source Control',
     name: 'Model & Reasoning Effort',
-    description: 'Active AI model display name and reasoning effort level (`[🧠 HIGH]`, `[🧠 LOW]`).',
+    description: 'Active AI model display name and reasoning effort level (`[🧠 HIGH]`, `[🧠 MED]`, `[🧠 LOW]`).',
     payloadPath: 'payload.model.display_name, payload.model.effort',
-    fullSample: 'Gemini 3.7 Flash [🧠 HIGH]',
-    shortSample: 'Flash [HIGH]',
-    minimalSample: 'Flash',
-    stylingNotes: 'Minimal strips effort tag and simplifies name (e.g. `Flash`, `Sonnet`, `Opus`, `Pro`).'
+    fullSample: 'Gemini 4 Argon [🧠 HIGH]',
+    shortSample: 'Argon [HI]',
+    minimalSample: 'Argon',
+    stylingNotes: 'Full strips duplicate parenthesized effort tags; Short uses compact `[HI]`/`[MED]`/`[LOW]`; Minimal simplifies to `Argon`, `Flash`, `Sonnet`, `Opus`, `Pro`.'
   },
   {
     key: 'state',
@@ -321,12 +321,12 @@ const TELEMETRY_ITEMS = [
     key: 'quota_weekly',
     category: 'Resource Quotas & Telemetry',
     name: 'Weekly Quota Reserve',
-    description: 'Weekly secondary quota reserve percentage across Gemini or 3P providers.',
-    payloadPath: 'payload.quota["gemini-weekly"], payload.quota["3p-weekly"]',
-    fullSample: 'Wk: 80%',
-    shortSample: 'Wk: 80%',
-    minimalSample: '80%',
-    stylingNotes: 'Suppressed when provider does not expose a weekly quota limit.'
+    description: 'Weekly quota reserve percentage across Gemini (`gemini-argon-wtu-weekly` + `gemini-weekly` side-by-side) or 3P providers.',
+    payloadPath: 'payload.quota["gemini-argon-wtu-weekly"], payload.quota["gemini-weekly"], payload.quota["3p-weekly"]',
+    fullSample: 'Wk(A): 64% / Wk(F): 100%',
+    shortSample: 'Wk(A): 64% / Wk(F): 100%',
+    minimalSample: 'Wk(A): 64% / Wk(F): 100%',
+    stylingNotes: 'Renders both Argon WTU (`Wk(A)`) and Flash (`Wk(F)`) weekly pools side-by-side when both exist, with single-bucket `Wk:` fallback.'
   },
   {
     key: 'session',
@@ -759,7 +759,7 @@ flowchart TD
    - Inspects terminal column width and per-item style overrides (\`item_styles\`).
    - Renders 1 to 4 configurable lines delimited by custom separators (\`│\`).
 4. **ANSI Emission & Tab Synchronization:**
-   - Broadcasts ANSI OSC 0 escape sequences (\`\\x1b]0;[agy] <workspace>\\x07\`) to dynamically label Windows Terminal tabs.
+   - Broadcasts ANSI OSC 0 escape sequences (\`\\x1b]0;\u{1FA90} agy - <workspace>\\x07\`) to dynamically label Windows Terminal tabs.
    - Emits formatted multi-line statusline to \`process.stdout\` in **< 15 milliseconds**.
 `;
 

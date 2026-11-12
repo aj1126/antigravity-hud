@@ -151,11 +151,11 @@ For detailed guides, architectural specifications, and full schemas:
 | :--- | :--- | :--- | :--- |
 | **`workspace`** | Workspace & Git Branch — Active workspace folder, Antigravity project name alias, and Git branch with ahead/behind indicators (`↑1 ↓2`) | `📁 MyProject › Core (⎇ main * ↑1)` | `📁 Core` |
 | **`git_status`** | Git Clean / Dirty Status — Working directory state indicating whether uncommitted changes exist (`+staged`, `~unstaged`, `?untracked`) | `🌿 Clean / ⚠️ Dirty (+1 ~2)` | `🌿 / ⚠️` |
-| **`model`** | Model & Reasoning Effort — Active AI model display name and reasoning effort level (`[🧠 HIGH]`, `[🧠 LOW]`) | `Gemini 3.7 Flash [🧠 HIGH]` | `Flash` |
+| **`model`** | Model & Reasoning Effort — Active AI model display name and reasoning effort level (`[🧠 HIGH]`, `[🧠 MED]`, `[🧠 LOW]`) | `Gemini 4 Argon [🧠 HIGH]` | `Argon` |
 | **`state`** | Agent Lifecycle State — Current agent execution state (`[WORKING]`, `[IDLE]`, `[WAITING]`, `[ERROR]`) | `[WORKING]` | `● (colored)` |
 | **`context`** | Context Window & Prompt Cache — Real-time context window token utilization percentage, token count summary, visual block bar, and prompt cache hit rate | `Ctx: ██░░░░░░░░ 22% (229k tok) (⚡ 93% Cache)` | `Ctx: 22%` |
 | **`quota_5h`** | 5-Hour Rolling Quota Reserve — Active 5-hour rolling token reserve percentage and countdown reset timer (`↻ 3h 14m`) | `Quota: 53% (↻ 3h 34m)` | `5h: 53%` |
-| **`quota_weekly`** | Weekly Quota Reserve — Weekly secondary quota reserve percentage across Gemini or 3P providers | `Wk: 80%` | `80%` |
+| **`quota_weekly`** | Weekly Quota Reserve — Weekly quota reserve percentage across Gemini (`gemini-argon-wtu-weekly` + `gemini-weekly` side-by-side) or 3P providers | `Wk(A): 64% / Wk(F): 100%` | `Wk(A): 64% / Wk(F): 100%` |
 | **`session`** | Session Elapsed Uptime — Color-graded elapsed time since session start with optional seconds display and configurable threshold bands | `⏱️ 1h 24m 15s` | `⏱️ 84m` |
 | **`mcp`** | Registered MCP Servers — Count of connected Model Context Protocol (MCP) tool servers | `🔌 15 MCP` | `🔌 15` |
 | **`tasks`** | Running Background Tasks — Count of active, uncompleted background subshell tasks | `⚙️ 2 tasks` | `⚙️ 2` |

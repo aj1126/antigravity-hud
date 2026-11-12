@@ -76,7 +76,7 @@ $itemMeta = [ordered]@{
 $previewText = @{
     'workspace'    = @{ full = 'PowerShell (branch: preview *)'; short = 'PowerShell (preview *)'; minimal = 'PS' }
     'git_status'   = @{ full = 'Git: Clean'; short = 'Clean'; minimal = 'OK' }
-    'model'        = @{ full = 'Gemini 3.7 Flash [HIGH]'; short = 'Flash [HI]'; minimal = 'F-HI' }
+    'model'        = @{ full = 'Gemini 4 Argon [HIGH]'; short = 'Argon [HI]'; minimal = 'Argon' }
     'state'        = @{ full = '[IDLE]'; short = 'IDLE'; minimal = 'IDL' }
     'auth'         = @{ full = 'Auth: API-Key'; short = 'API-Key'; minimal = 'KEY' }
     'sandbox'      = @{ full = 'Sandbox: ON'; short = 'SBX'; minimal = 'SB' }
@@ -84,7 +84,7 @@ $previewText = @{
     'context'      = @{ full = 'Ctx: 14% (143k) Cache: 91%'; short = '14% (91%C)'; minimal = '14%' }
     'fork'         = @{ full = 'Fork @ 60%'; short = 'Fork: 60%'; minimal = 'F60' }
     'quota_5h'     = @{ full = 'Quota: 56% (reset 2h 23m)'; short = '56% 2h23m'; minimal = '56%' }
-    'quota_weekly' = @{ full = 'Weekly: 80%'; short = 'Wk: 80%'; minimal = '80%' }
+    'quota_weekly' = @{ full = 'Wk(A): 64% / Wk(F): 100%'; short = 'Wk(A): 64% / Wk(F): 100%'; minimal = 'Wk(A): 64% / Wk(F): 100%' }
     'credits'      = @{ full = '💳 1,250 Credits'; short = '💳 1.25k'; minimal = '💳' }
     'plan_tier'    = @{ full = '✨ Google AI Pro'; short = '✨ Pro'; minimal = '✨' }
     'mcp'          = @{ full = '14 MCP Servers'; short = '14 MCP'; minimal = '14M' }

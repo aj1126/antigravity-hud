@@ -531,6 +531,10 @@ function performDeploy(options = {}) {
       const destExists = fs.existsSync(dest);
       const destHash = destExists ? getFileSha256(dest) : null;
 
+      if (m.type === 'config' && destExists) {
+        continue;
+      }
+
       if (destExists && repoHash === destHash) {
         continue;
       }
@@ -1580,7 +1584,7 @@ if (args.length > 0) {
       console.log(`  Current CWD:          \x1b[90m${cwd}\x1b[0m`);
       console.log(`  Custom Title:         ${curTitle ? `\x1b[32m${curTitle}\x1b[0m` : '\x1b[33m[NONE] (using default)\x1b[0m'}`);
       console.log(`  Resolved Display:     \x1b[34m📁 ${curTitle || defTarget}\x1b[0m`);
-      console.log(`  Terminal Tab Title:   \x1b[35m[agy] ${curTitle || defTarget}\x1b[0m\n`);
+      console.log(`  Terminal Tab Title:   \x1b[35m\u{1FA90} agy - ${curTitle || defTarget}\x1b[0m\n`);
       console.log('\x1b[90mUsage:\x1b[0m');
       console.log('  hud title <custom title>         Set custom title for current workspace/session');
       console.log('  hud title reset                  Clear custom title and revert to default folder name');
@@ -1596,13 +1600,13 @@ if (args.length > 0) {
       let defTarget = wsName;
       if (projName && projName.toLowerCase() !== wsName.toLowerCase()) defTarget = `${projName} › ${wsName}`;
       else if (projName) defTarget = projName;
-      process.stdout.write(`\x1b]0;[agy] ${defTarget}\x07`);
+      process.stdout.write(`\x1b]0;\u{1FA90} agy - ${defTarget}\x07`);
       process.exit(0);
     }
 
     setCustomTitle(cleanSub, cwd);
     console.log(`\x1b[32m✔ Session & tab title set to:\x1b[0m \x1b[1m\x1b[36m${cleanSub}\x1b[0m`);
-    process.stdout.write(`\x1b]0;[agy] ${cleanSub}\x07`);
+    process.stdout.write(`\x1b]0;\u{1FA90} agy - ${cleanSub}\x07`);
     process.exit(0);
   }
 
@@ -1779,7 +1783,7 @@ if (args.length > 0) {
     console.log('  • \x1b[32mcontext\x1b[0m       Ctx: progress bar, % used & prompt cache rate');
     console.log('  • \x1b[32mfork\x1b[0m          🍴 Milestone & step fork advisory badge (snoozeable)');
     console.log('  • \x1b[32mquota_5h\x1b[0m      Quota: 5-hour reserve % & reset time');
-    console.log('  • \x1b[32mquota_weekly\x1b[0m  Wk: weekly quota reserve % & reset date/time');
+    console.log('  • \x1b[32mquota_weekly\x1b[0m  Wk(A)/Wk(F): weekly quota reserve % & reset date/time');
     console.log('  • \x1b[32mcredits\x1b[0m       💳 Model AI Credits & Zero-Quota balance');
     console.log('  • \x1b[32mplan_tier\x1b[0m     ✨ Account Subscription Plan Tier');
     console.log('  • \x1b[32mmcp\x1b[0m           🔌 Active MCP server count');
@@ -2259,25 +2263,28 @@ function formatDuration(seconds, showSeconds = true, style = 'full') {
 function getQuotaSegments(payload, style5h = 'full', styleWk = 'full') {
   const modelStr = (typeof payload.model === 'string' ? payload.model : payload.model?.display_name || payload.model?.id || '').toLowerCase();
   const is3p = modelStr.includes('claude') || modelStr.includes('gpt') || modelStr.includes('3p') || modelStr.includes('openai') || modelStr.includes('sonnet') || modelStr.includes('opus');
+  const isArgon = modelStr.includes('argon');
 
   const quotaMap = payload.quota || payload.quotas || payload.rate_limits || payload.limits || {};
 
   let q5hBucket = null;
   let qWkBucket = null;
+  const qArgonWkBucket = quotaMap['gemini-argon-wtu-weekly'] || quotaMap['gemini_argon_wtu_weekly'] || quotaMap['argon-weekly'] || null;
+  const qFlashWkBucket = quotaMap['gemini-weekly'] || quotaMap['gemini_weekly'] || quotaMap['weekly'] || quotaMap['secondary'] || null;
 
   if (is3p) {
     q5hBucket = quotaMap['3p-5h'] || quotaMap['3p_5h'] || quotaMap['claude-5h'] || quotaMap['gpt-5h'];
     qWkBucket = quotaMap['3p-weekly'] || quotaMap['3p_weekly'] || quotaMap['claude-weekly'] || quotaMap['gpt-weekly'];
   } else {
     q5hBucket = quotaMap['gemini-5h'] || quotaMap['gemini_5h'] || quotaMap['5h'] || quotaMap['rolling_5h'] || quotaMap['primary'];
-    qWkBucket = quotaMap['gemini-weekly'] || quotaMap['gemini_weekly'] || quotaMap['weekly'] || quotaMap['secondary'];
+    qWkBucket = isArgon ? (qArgonWkBucket || qFlashWkBucket) : (qFlashWkBucket || qArgonWkBucket);
   }
 
   if (!q5hBucket) {
     q5hBucket = quotaMap['gemini-5h'] || quotaMap['3p-5h'] || quotaMap['5h'] || quotaMap['primary'] || Object.values(quotaMap)[0];
   }
   if (!qWkBucket) {
-    qWkBucket = quotaMap['gemini-weekly'] || quotaMap['3p-weekly'] || quotaMap['weekly'] || quotaMap['secondary'] || Object.values(quotaMap)[1];
+    qWkBucket = qArgonWkBucket || qFlashWkBucket || quotaMap['3p-weekly'] || quotaMap['weekly'] || quotaMap['secondary'] || Object.values(quotaMap)[1];
   }
 
   function extractPercent(bucket) {
@@ -2313,22 +2320,37 @@ function getQuotaSegments(payload, style5h = 'full', styleWk = 'full') {
   let q5hReset = extractReset(q5hBucket);
   let qWkPercent = extractPercent(qWkBucket);
   let qWkReset = extractReset(qWkBucket);
+  let qArgonWkPercent = extractPercent(qArgonWkBucket);
+  let qArgonWkReset = extractReset(qArgonWkBucket);
+  let qFlashWkPercent = extractPercent(qFlashWkBucket);
+  let qFlashWkReset = extractReset(qFlashWkBucket);
 
+  const testQuotaFile = process.env.HUD_TEST_QUOTA_FILE || null;
   const isTestMode = Boolean(process.env.HUD_TEST_MODE || payload.is_test);
-  const quotaCacheFile = path.join(homeDir, '.gemini', 'tmp', 'last_quota.json');
-  if (!isTestMode && (q5hPercent !== null || qWkPercent !== null)) {
+  const quotaCacheFile = testQuotaFile || path.join(homeDir, '.gemini', 'tmp', 'last_quota.json');
+  const allowQuotaCache = !isTestMode || Boolean(testQuotaFile);
+
+  if (allowQuotaCache && (q5hPercent !== null || qWkPercent !== null || qArgonWkPercent !== null || qFlashWkPercent !== null)) {
     try {
       const qDir = path.dirname(quotaCacheFile);
       if (!fs.existsSync(qDir)) fs.mkdirSync(qDir, { recursive: true });
       const now = Date.now();
       const rounded5h = q5hPercent !== null ? Math.round(q5hPercent) : null;
       const roundedWk = qWkPercent !== null ? Math.round(qWkPercent) : null;
+      const roundedArgonWk = qArgonWkPercent !== null ? Math.round(qArgonWkPercent) : null;
+      const roundedFlashWk = qFlashWkPercent !== null ? Math.round(qFlashWkPercent) : null;
 
       let shouldWrite = true;
       if (fs.existsSync(quotaCacheFile)) {
         try {
           const prev = JSON.parse(fs.readFileSync(quotaCacheFile, 'utf8'));
-          if (prev.q5hPercent === rounded5h && prev.qWkPercent === roundedWk && (now - prev.updatedAt < 30000)) {
+          if (
+            prev.q5hPercent === rounded5h &&
+            prev.qWkPercent === roundedWk &&
+            prev.qArgonWkPercent === roundedArgonWk &&
+            prev.qFlashWkPercent === roundedFlashWk &&
+            (now - prev.updatedAt < 30000)
+          ) {
             shouldWrite = false;
           }
         } catch (_) {}
@@ -2342,25 +2364,43 @@ function getQuotaSegments(payload, style5h = 'full', styleWk = 'full') {
           qWkPercent: roundedWk,
           qWkReset,
           qWkResetAt: qWkReset ? now + qWkReset * 1000 : null,
+          qArgonWkPercent: roundedArgonWk,
+          qArgonWkReset,
+          qArgonWkResetAt: qArgonWkReset ? now + qArgonWkReset * 1000 : null,
+          qFlashWkPercent: roundedFlashWk,
+          qFlashWkReset,
+          qFlashWkResetAt: qFlashWkReset ? now + qFlashWkReset * 1000 : null,
           updatedAt: now
         }), 'utf8');
       }
     } catch (_) {}
-  } else if (!isTestMode && fs.existsSync(quotaCacheFile)) {
+  } else if (allowQuotaCache && fs.existsSync(quotaCacheFile)) {
     try {
       const cached = JSON.parse(fs.readFileSync(quotaCacheFile, 'utf8'));
       if (Date.now() - cached.updatedAt < 24 * 3600 * 1000) {
-        if (q5hPercent === null) q5hPercent = cached.q5hPercent;
+        if (q5hPercent === null) q5hPercent = cached.q5hPercent ?? null;
         if (q5hReset === null && (cached.q5hReset || cached.q5hResetAt)) {
           const resetAt = cached.q5hResetAt || (cached.updatedAt + cached.q5hReset * 1000);
           const remaining = Math.floor((resetAt - Date.now()) / 1000);
           q5hReset = Math.max(0, remaining);
         }
-        if (qWkPercent === null) qWkPercent = cached.qWkPercent;
+        if (qWkPercent === null) qWkPercent = cached.qWkPercent ?? null;
         if (qWkReset === null && (cached.qWkReset || cached.qWkResetAt)) {
           const resetAt = cached.qWkResetAt || (cached.updatedAt + cached.qWkReset * 1000);
           const remaining = Math.floor((resetAt - Date.now()) / 1000);
           qWkReset = Math.max(0, remaining);
+        }
+        if (qArgonWkPercent === null && cached.qArgonWkPercent !== undefined) qArgonWkPercent = cached.qArgonWkPercent;
+        if (qArgonWkReset === null && (cached.qArgonWkReset || cached.qArgonWkResetAt)) {
+          const resetAt = cached.qArgonWkResetAt || (cached.updatedAt + cached.qArgonWkReset * 1000);
+          const remaining = Math.floor((resetAt - Date.now()) / 1000);
+          qArgonWkReset = Math.max(0, remaining);
+        }
+        if (qFlashWkPercent === null && cached.qFlashWkPercent !== undefined) qFlashWkPercent = cached.qFlashWkPercent;
+        if (qFlashWkReset === null && (cached.qFlashWkReset || cached.qFlashWkResetAt)) {
+          const resetAt = cached.qFlashWkResetAt || (cached.updatedAt + cached.qFlashWkReset * 1000);
+          const remaining = Math.floor((resetAt - Date.now()) / 1000);
+          qFlashWkReset = Math.max(0, remaining);
         }
       }
     } catch (_) {}
@@ -2384,7 +2424,21 @@ function getQuotaSegments(payload, style5h = 'full', styleWk = 'full') {
   }
 
   let quotaWkSegment = '';
-  if (qWkPercent !== null) {
+  if (!is3p && qArgonWkPercent !== null && qFlashWkPercent !== null) {
+    const valA = Math.round(qArgonWkPercent);
+    let colA = '\x1b[32m';
+    if (valA < 20) colA = '\x1b[31m';
+    else if (valA < 50) colA = '\x1b[33m';
+
+    const valF = Math.round(qFlashWkPercent);
+    let colF = '\x1b[32m';
+    if (valF < 20) colF = '\x1b[31m';
+    else if (valF < 50) colF = '\x1b[33m';
+
+    const activeWkReset = isArgon ? (qArgonWkReset || qFlashWkReset) : (qFlashWkReset || qArgonWkReset);
+    const resetWkTime = (styleWk !== 'minimal' && activeWkReset && activeWkReset > 0) ? ` (↻ ${formatResetDateTime(activeWkReset, true, styleWk)})` : '';
+    quotaWkSegment = `Wk(A): ${colA}${valA}%\x1b[0m / Wk(F): ${colF}${valF}%\x1b[0m${resetWkTime}`;
+  } else if (qWkPercent !== null) {
     const val = Math.round(qWkPercent);
     let col = '\x1b[32m';
     if (val < 20) col = '\x1b[31m';
@@ -2398,8 +2452,11 @@ function getQuotaSegments(payload, style5h = 'full', styleWk = 'full') {
     }
   }
 
-  const isZeroQuota = (q5hPercent !== null && Math.round(q5hPercent) === 0) || (qWkPercent !== null && Math.round(qWkPercent) === 0);
-  return { quota5hSegment, quotaWkSegment, isZeroQuota, q5hPercent, qWkPercent };
+  const activeWkPercent = (!is3p && isArgon && qArgonWkPercent !== null)
+    ? qArgonWkPercent
+    : ((!is3p && !isArgon && qFlashWkPercent !== null) ? qFlashWkPercent : qWkPercent);
+  const isZeroQuota = (q5hPercent !== null && Math.round(q5hPercent) === 0) || (activeWkPercent !== null && Math.round(activeWkPercent) === 0);
+  return { quota5hSegment, quotaWkSegment, isZeroQuota, q5hPercent, qWkPercent, qArgonWkPercent, qFlashWkPercent };
 }
 
 function getCreditsSegment(payload, style = 'full', isZeroQuota = false) {
@@ -2656,16 +2713,40 @@ process.stdin.on('end', () => {
       } else if (payload.model && typeof payload.model === 'object') {
         modelName = payload.model.display_name || payload.model.id || 'Gemini';
       }
-      if (stMdl === 'minimal') {
-        if (modelName.toLowerCase().includes('flash')) modelName = 'Flash';
-        else if (modelName.toLowerCase().includes('sonnet')) modelName = 'Sonnet';
-        else if (modelName.toLowerCase().includes('opus')) modelName = 'Opus';
-        else if (modelName.toLowerCase().includes('pro')) modelName = 'Pro';
-        else modelName = modelName.split(' ')[0];
-      } else if (stMdl === 'short') {
-        modelName = modelName.replace(/\(.*?\)/g, '').trim();
+      let rawEffort = (payload.model && typeof payload.model === 'object')
+        ? (payload.model.effort || payload.model.reasoning_effort || '')
+        : '';
+      if (!rawEffort) {
+        const parenMatch = modelName.match(/\((Low|Medium|High|XHigh|Max|Min)\)/i);
+        if (parenMatch) rawEffort = parenMatch[1];
       }
-      const effort = (stMdl === 'full' && payload.model?.effort) ? ` \x1b[90m[🧠 ${payload.model.effort.toUpperCase()}]\x1b[0m` : '';
+      const baseModelName = modelName.replace(/\s*\((Low|Medium|High|XHigh|Max|Min)\)/gi, '').trim();
+      const lowerMdl = baseModelName.toLowerCase();
+      let effort = '';
+      if (stMdl === 'minimal') {
+        if (lowerMdl.includes('argon')) modelName = 'Argon';
+        else if (lowerMdl.includes('hydrogen')) modelName = 'Hydrogen';
+        else if (lowerMdl.includes('flash')) modelName = 'Flash';
+        else if (lowerMdl.includes('sonnet')) modelName = 'Sonnet';
+        else if (lowerMdl.includes('opus')) modelName = 'Opus';
+        else if (lowerMdl.includes('pro')) modelName = 'Pro';
+        else modelName = baseModelName.split(' ')[0];
+      } else if (stMdl === 'short') {
+        const shortFamily = lowerMdl.includes('argon') ? 'Argon' : (lowerMdl.includes('hydrogen') ? 'Hydrogen' : null);
+        if (shortFamily) {
+          modelName = shortFamily;
+          const shortEffMap = { XHIGH: 'XHI', HIGH: 'HI', MEDIUM: 'MED', LOW: 'LOW', MAX: 'MAX', MIN: 'MIN' };
+          const shortEff = rawEffort ? (shortEffMap[rawEffort.toUpperCase()] || rawEffort.toUpperCase()) : '';
+          if (shortEff) effort = ` \x1b[90m[${shortEff}]\x1b[0m`;
+        } else {
+          modelName = baseModelName.replace(/\(.*?\)/g, '').trim();
+        }
+      } else {
+        modelName = baseModelName;
+        if (rawEffort) {
+          effort = ` \x1b[90m[🧠 ${rawEffort.toUpperCase()}]\x1b[0m`;
+        }
+      }
       modelSegment = `\x1b[1m\x1b[36m${modelName}\x1b[0m${effort}`;
     }
 
@@ -2963,7 +3044,7 @@ process.stdin.on('end', () => {
     const output = renderedLines.join('\n');
 
     // Emit OSC 0 escape sequence to synchronize terminal tab / window title
-    process.stdout.write(`\x1b]0;[agy] ${displayTarget}\x07`);
+    process.stdout.write(`\x1b]0;\u{1FA90} agy - ${displayTarget}\x07`);
     process.stdout.write(output);
   } catch (err) {
     process.stdout.write('Gemini │ [READY]');
