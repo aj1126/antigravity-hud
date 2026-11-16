@@ -48,6 +48,14 @@ Describe "Antigravity CLI (AGY) - WinForms HUD Configurator Headless Test Suite"
             } | Should -Not -Throw
         }
 
+        It "Baseline: hud_gui.ps1 defines itemMeta and 3-tier previewText for all 18 existing items" {
+            $rawGui = Get-Content -Path $script:HudGuiPath -Raw -Encoding utf8
+            $expectedKeys = @('workspace','git_status','model','state','auth','sandbox','session','context','fork','quota_5h','quota_weekly','credits','plan_tier','mcp','subagents','tasks','artifacts','queue')
+            foreach ($k in $expectedKeys) {
+                $rawGui | Should -Match "'$k'\s*="
+            }
+        }
+
         It "Should preserve unmanaged keys during non-destructive save" {
             $rawJson = Get-Content -Path $script:TestConfigPath -Raw -Encoding utf8 | ConvertFrom-Json
             $rawJson.custom_unmanaged_key | Should -Be "preserved_value_123"

@@ -436,6 +436,97 @@ runTest('Engine: Gemini 4 Hydrogen binds to gemini-weekly (not Argon WTU) and re
   assert(clean.includes('[0Q Active]'), 'Expected [0Q Active] for Hydrogen when gemini-weekly is 0%');
 });
 
+// 17. Baseline Characterization: Workspace Custom Title Isolation vs conversation_title
+runTest('Baseline: hud title overrides workspace 📁 badge in isolated HOME without using payload.conversation_title', () => {
+  const isolatedHome = path.join(tempTestDir, 'isolated_home_title');
+  const isoCfg = path.join(isolatedHome, 'hud_config.json');
+  fs.mkdirSync(isolatedHome, { recursive: true });
+  fs.copyFileSync(fixtureCfgPath, isoCfg);
+
+  const isoEnv = {
+    ...process.env,
+    USERPROFILE: isolatedHome,
+    HOME: isolatedHome,
+    HUD_TEST_MODE: '1',
+    HUD_CONFIG_PATH: isoCfg
+  };
+
+  // Without custom title, conversation_title must NOT override the 📁 workspace label
+  const payload = JSON.parse(fs.readFileSync(fixturePayloadPath, 'utf8'));
+  payload.conversation_title = 'Session_Only_Name';
+  let res = spawnSync('node', [hudScriptPath], { input: JSON.stringify(payload), env: isoEnv, encoding: 'utf8' });
+  assert.strictEqual(res.status, 0);
+  let clean = stripAnsi(res.stdout);
+  assert(clean.includes('📁 antigravity-hud'), `Expected workspace folder name, got: ${clean}`);
+  assert(!clean.includes('📁 Session_Only_Name'), 'conversation_title must not hijack workspace 📁 badge');
+
+  // With hud title, workspace_titles.json overrides 📁 badge and emits OSC 0
+  res = spawnSync('node', [hudScriptPath, 'title', 'Pinned Workspace Name'], { env: isoEnv, encoding: 'utf8', cwd: path.resolve(__dirname, '..') });
+  assert.strictEqual(res.status, 0);
+  const titlesPath = path.join(isolatedHome, '.gemini', 'tmp', 'workspace_titles.json');
+  assert(fs.existsSync(titlesPath), 'workspace_titles.json must be created in isolated HOME');
+
+  res = spawnSync('node', [hudScriptPath], { input: JSON.stringify(payload), env: isoEnv, encoding: 'utf8' });
+  assert.strictEqual(res.status, 0);
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('📁 Pinned Workspace Name'), `Expected custom workspace title in 📁 badge, got: ${clean}`);
+  assert(res.stdout.includes('\x1b]0;\u{1FA90} agy - Pinned Workspace Name\x07'), 'Expected OSC 0 tab title');
+
+  // Reset restores directory name
+  res = spawnSync('node', [hudScriptPath, 'title', 'reset'], { env: isoEnv, encoding: 'utf8', cwd: path.resolve(__dirname, '..') });
+  assert.strictEqual(res.status, 0);
+  res = spawnSync('node', [hudScriptPath], { input: JSON.stringify(payload), env: isoEnv, encoding: 'utf8' });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('📁 antigravity-hud'), `Expected reset to restore folder name, got: ${clean}`);
+});
+
+// 18. Baseline Characterization: Session Uptime Formatting Tiers & show_seconds Toggle
+runTest('Baseline: session uptime renders full/short/minimal durations and honors show_seconds=false', () => {
+  const payloadStr = fs.readFileSync(fixturePayloadPath, 'utf8');
+  let cfg = JSON.parse(fs.readFileSync(fixtureCfgPath, 'utf8'));
+
+  // Full mode (1845s = 30m 45s)
+  cfg.item_styles = { session: 'full' };
+  fs.writeFileSync(testConfigPath, JSON.stringify(cfg, null, 2), 'utf8');
+  let res = spawnSync('node', [hudScriptPath], { input: payloadStr, env, encoding: 'utf8' });
+  assert.strictEqual(res.status, 0);
+  let clean = stripAnsi(res.stdout);
+  assert(clean.includes('⏱️ 30m 45s'), `Expected full uptime ⏱️ 30m 45s, got: ${clean}`);
+
+  // Short mode -> ⏱️ 30m
+  cfg.item_styles = { session: 'short' };
+  fs.writeFileSync(testConfigPath, JSON.stringify(cfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], { input: payloadStr, env, encoding: 'utf8' });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('⏱️ 30m') && !clean.includes('⏱️ 30m 45s'), `Expected short uptime ⏱️ 30m, got: ${clean}`);
+
+  // Full mode with show_seconds: false -> ⏱️ 30m
+  cfg.item_styles = { session: 'full' };
+  cfg.session_uptime.show_seconds = false;
+  fs.writeFileSync(testConfigPath, JSON.stringify(cfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], { input: payloadStr, env, encoding: 'utf8' });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('⏱️ 30m') && !clean.includes('⏱️ 30m 45s'), `Expected show_seconds=false to omit seconds, got: ${clean}`);
+});
+
+// 19. Baseline Characterization: Existing auth, sandbox, and plan_tier Rendering
+runTest('Baseline: auth, sandbox, and plan_tier render expected badges when enabled', () => {
+  const payload = JSON.parse(fs.readFileSync(fixturePayloadPath, 'utf8'));
+  payload.auth_type = 'gemini-api-key';
+  const cfg = JSON.parse(fs.readFileSync(fixtureCfgPath, 'utf8'));
+  cfg.disabled = [];
+  cfg.line4 = ['auth', 'sandbox', 'plan_tier'];
+  cfg.item_styles = { auth: 'full', sandbox: 'full', plan_tier: 'full' };
+  fs.writeFileSync(testConfigPath, JSON.stringify(cfg, null, 2), 'utf8');
+
+  let res = spawnSync('node', [hudScriptPath], { input: JSON.stringify(payload), env, encoding: 'utf8' });
+  assert.strictEqual(res.status, 0);
+  let clean = stripAnsi(res.stdout);
+  assert(clean.includes('🔑 API-Key'), `Expected auth badge, got: ${clean}`);
+  assert(clean.includes('🛡️ Sandbox'), `Expected sandbox badge, got: ${clean}`);
+  assert(clean.includes('✨ Google AI Pro'), `Expected plan_tier badge, got: ${clean}`);
+});
+
 // Cleanup test scratch
 try {
   fs.rmSync(tempTestDir, { recursive: true, force: true });
