@@ -72,7 +72,7 @@ runTest('DocCatalog: TELEMETRY_ITEMS.md documents all 16 metrics', () => {
   const content = fs.readFileSync(path.join(docsDir, 'TELEMETRY_ITEMS.md'), 'utf8');
   const expectedItems = [
     'workspace', 'git_status', 'model', 'state',
-    'context', 'quota_5h', 'quota_weekly', 'session',
+    'context', 'quota_5h', 'quota_weekly', 'session', 'session_name', 'session_id',
     'mcp', 'tasks', 'subagents', 'artifacts', 'queue',
     'sandbox', 'auth', 'fork'
   ];

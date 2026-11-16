@@ -527,6 +527,86 @@ runTest('Baseline: auth, sandbox, and plan_tier render expected badges when enab
   assert(clean.includes('✨ Google AI Pro'), `Expected plan_tier badge, got: ${clean}`);
 });
 
+// 20. TDD Spec: session_name Footer Item (full / short / minimal / truncation / empty-hidden)
+runTest('TDD: session_name renders conversation_title across tiers and hides when empty', () => {
+  const payload = JSON.parse(fs.readFileSync(fixturePayloadPath, 'utf8'));
+  const cfg = JSON.parse(fs.readFileSync(fixtureCfgPath, 'utf8'));
+  cfg.disabled = [];
+  cfg.line4 = ['session_name'];
+
+  // Untitled/empty payload -> omitted cleanly
+  delete payload.conversation_title;
+  delete payload.session_title;
+  delete payload.title;
+  cfg.item_styles = { session_name: 'full' };
+  fs.writeFileSync(testConfigPath, JSON.stringify(cfg, null, 2), 'utf8');
+  let res = spawnSync('node', [hudScriptPath], { input: JSON.stringify(payload), env, encoding: 'utf8' });
+  assert.strictEqual(res.status, 0);
+  let clean = stripAnsi(res.stdout);
+  assert(!clean.includes('🏷️'), `Empty conversation_title must not render 🏷️ badge, got: ${clean}`);
+
+  // Short title across full / short / minimal
+  payload.conversation_title = 'MasterControlCenter_SitStu_Nov2026';
+  fs.writeFileSync(testConfigPath, JSON.stringify(cfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], { input: JSON.stringify(payload), env, encoding: 'utf8' });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('🏷️ MasterControlCenter_SitStu_Nov2026'), `Expected full session_name, got: ${clean}`);
+  assert(clean.includes('📁 antigravity-hud'), 'workspace 📁 must stay independent of session_name');
+
+  cfg.item_styles = { session_name: 'short' };
+  fs.writeFileSync(testConfigPath, JSON.stringify(cfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], { input: JSON.stringify(payload), env, encoding: 'utf8' });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('🏷️ MasterControlCenter_Sit…'), `Expected truncated short session_name (<=24 chars), got: ${clean}`);
+
+  cfg.item_styles = { session_name: 'minimal' };
+  fs.writeFileSync(testConfigPath, JSON.stringify(cfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], { input: JSON.stringify(payload), env, encoding: 'utf8' });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('MasterControl…') && !clean.includes('🏷️'), `Expected minimal truncated session_name without icon, got: ${clean}`);
+});
+
+// 21. TDD Spec: session_id Footer Item (full UUID / short 8-char / minimal 8-char / empty-hidden)
+runTest('TDD: session_id renders full UUID in full mode, 8-char prefix in short/minimal, and hides when empty', () => {
+  const payload = JSON.parse(fs.readFileSync(fixturePayloadPath, 'utf8'));
+  const cfg = JSON.parse(fs.readFileSync(fixtureCfgPath, 'utf8'));
+  cfg.disabled = [];
+  cfg.line4 = ['session_id'];
+
+  // Full mode -> 🆔 + full ID
+  payload.session_id = 'c4389f31-ea6b-4188-92ac-49962cf376ef';
+  cfg.item_styles = { session_id: 'full' };
+  fs.writeFileSync(testConfigPath, JSON.stringify(cfg, null, 2), 'utf8');
+  let res = spawnSync('node', [hudScriptPath], { input: JSON.stringify(payload), env, encoding: 'utf8' });
+  assert.strictEqual(res.status, 0);
+  let clean = stripAnsi(res.stdout);
+  assert(clean.includes('🆔 c4389f31-ea6b-4188-92ac-49962cf376ef'), `Expected full session_id, got: ${clean}`);
+
+  // Short mode -> 🆔 c4389f31
+  cfg.item_styles = { session_id: 'short' };
+  fs.writeFileSync(testConfigPath, JSON.stringify(cfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], { input: JSON.stringify(payload), env, encoding: 'utf8' });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('🆔 c4389f31') && !clean.includes('49962cf376ef'), `Expected 8-char short session_id, got: ${clean}`);
+
+  // Minimal mode -> c4389f31 (no icon)
+  cfg.item_styles = { session_id: 'minimal' };
+  fs.writeFileSync(testConfigPath, JSON.stringify(cfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], { input: JSON.stringify(payload), env, encoding: 'utf8' });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('c4389f31') && !clean.includes('🆔'), `Expected minimal session_id without icon, got: ${clean}`);
+
+  // Missing IDs -> omitted cleanly
+  delete payload.session_id;
+  delete payload.conversation_id;
+  delete payload.thread_id;
+  cfg.item_styles = { session_id: 'full' };
+  fs.writeFileSync(testConfigPath, JSON.stringify(cfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], { input: JSON.stringify(payload), env, encoding: 'utf8' });
+  clean = stripAnsi(res.stdout);
+  assert(!clean.includes('🆔'), `Missing session_id must not render 🆔 badge, got: ${clean}`);
+});
+
 // Cleanup test scratch
 try {
   fs.rmSync(tempTestDir, { recursive: true, force: true });

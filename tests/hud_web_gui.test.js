@@ -53,7 +53,7 @@ runTest('Schema: All 16 telemetry items registered in web template', () => {
 // 2b. Baseline parity for extended items (credits, plan_tier) in ITEM_METADATA & preview switch
 runTest('Baseline: credits and plan_tier exist in ITEM_METADATA and getSampleItemText()', () => {
   const content = fs.readFileSync(htmlPath, 'utf8');
-  for (const key of ['credits', 'plan_tier']) {
+  for (const key of ['credits', 'plan_tier', 'session_name', 'session_id']) {
     assert(content.includes(`${key}: {`), `ITEM_METADATA missing ${key}`);
     assert(content.includes(`case '${key}':`), `getSampleItemText missing case '${key}'`);
   }
