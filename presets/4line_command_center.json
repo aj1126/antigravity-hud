@@ -28,6 +28,8 @@
     "sandbox",
     "auth",
     "session",
+    "session_name",
+    "session_id",
     "fork"
   ],
   "disabled": [],

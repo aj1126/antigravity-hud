@@ -32,7 +32,9 @@ The Antigravity HUD configuration is stored in JSON format at `~/.gemini/scripts
   ],
   "line4": [
     "sandbox",
-    "auth"
+    "auth",
+    "session_name",
+    "session_id"
   ],
   "disabled": [
     "session",
@@ -70,7 +72,7 @@ The Antigravity HUD configuration is stored in JSON format at `~/.gemini/scripts
 | `line1` | `array[string]` | `["workspace", "git_status", "model", "state"]` | Telemetry item keys assigned to Line 1 (Top). |
 | `line2` | `array[string]` | `["context", "quota_5h", "quota_weekly"]` | Telemetry item keys assigned to Line 2. |
 | `line3` | `array[string]` | `["mcp", "tasks", "subagents", "artifacts", "queue"]` | Telemetry item keys assigned to Line 3. |
-| `line4` | `array[string]` | `["sandbox", "auth", "session", "fork"]` | Telemetry item keys assigned to Line 4 (Bottom). |
+| `line4` | `array[string]` | `["sandbox", "auth", "session_name", "session_id"]` | Telemetry item keys assigned to Line 4 (Bottom). |
 | `disabled` | `array[string]` | `[]` | Explicitly disabled item keys suppressed from all lines. |
 | `item_styles` | `object` | `{}` | Per-item formatting overrides (e.g. `{"context": "short"}`). |
 | `session_uptime` | `object` | *(see below)* | Uptime display settings and color threshold bands. |

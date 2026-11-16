@@ -340,6 +340,28 @@ const TELEMETRY_ITEMS = [
     stylingNotes: 'Color transitions: Green (<=15m) -> Yellow (<=45m) -> Magenta (<=90m) -> Red (>90m).'
   },
   {
+    key: 'session_name',
+    category: 'Identity & Source Control',
+    name: 'Session Name (Title)',
+    description: 'Active Antigravity session title (`conversation_title`) rendered independently of the workspace directory badge.',
+    payloadPath: 'payload.conversation_title, payload.session_title, payload.title',
+    fullSample: '🏷️ MasterControlCenter_SitStu_Nov2026',
+    shortSample: '🏷️ MasterControlCenter_Sit…',
+    minimalSample: 'MasterControl…',
+    stylingNotes: 'Bright magenta accent; hidden automatically when session has no title.'
+  },
+  {
+    key: 'session_id',
+    category: 'Identity & Source Control',
+    name: 'Session UUID',
+    description: 'Active session or conversation identifier rendered as a dedicated footer item.',
+    payloadPath: 'payload.session_id, payload.conversation_id, payload.thread_id',
+    fullSample: '🆔 c4389f31-ea6b-4188-92ac-49962cf376ef',
+    shortSample: '🆔 c4389f31',
+    minimalSample: 'c4389f31',
+    stylingNotes: 'Muted gray metadata styling; full UUID in full mode, 8-char prefix in short/minimal modes.'
+  },
+  {
     key: 'mcp',
     category: 'Background Workers & System',
     name: 'Registered MCP Servers',
@@ -519,9 +541,9 @@ ${categories.map(cat => `- [${cat}](#${cat.toLowerCase().replace(/[^a-z0-9]+/g, 
 function generateTelemetryItemsDoc() {
   const categories = [...new Set(TELEMETRY_ITEMS.map(i => i.category))];
 
-  let md = `# 🧩 Telemetry Metrics & Statusline Elements (16 Items)
+  let md = `# 🧩 Telemetry Metrics & Statusline Elements (${TELEMETRY_ITEMS.length} Items)
 
-The Antigravity HUD engine supports **16 real-time telemetry elements** across up to 4 configurable display tiers. Each element features adaptive rendering across \`full\`, \`short\`, and \`minimal\` text condensation modes.
+The Antigravity HUD engine supports **${TELEMETRY_ITEMS.length} real-time telemetry elements** across up to 4 configurable display tiers. Each element features adaptive rendering across \`full\`, \`short\`, and \`minimal\` text condensation modes.
 
 ---
 
@@ -589,7 +611,7 @@ ${cfgSample}
 | \`line1\` | \`array[string]\` | \`["workspace", "git_status", "model", "state"]\` | Telemetry item keys assigned to Line 1 (Top). |
 | \`line2\` | \`array[string]\` | \`["context", "quota_5h", "quota_weekly"]\` | Telemetry item keys assigned to Line 2. |
 | \`line3\` | \`array[string]\` | \`["mcp", "tasks", "subagents", "artifacts", "queue"]\` | Telemetry item keys assigned to Line 3. |
-| \`line4\` | \`array[string]\` | \`["sandbox", "auth", "session", "fork"]\` | Telemetry item keys assigned to Line 4 (Bottom). |
+| \`line4\` | \`array[string]\` | \`["sandbox", "auth", "session_name", "session_id"]\` | Telemetry item keys assigned to Line 4 (Bottom). |
 | \`disabled\` | \`array[string]\` | \`[]\` | Explicitly disabled item keys suppressed from all lines. |
 | \`item_styles\` | \`object\` | \`{}\` | Per-item formatting overrides (e.g. \`{"context": "short"}\`). |
 | \`session_uptime\` | \`object\` | *(see below)* | Uptime display settings and color threshold bands. |

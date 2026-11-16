@@ -1,5 +1,20 @@
 # Developer Log - Antigravity HUD (`antigravity-hud`)
 
+## Session Milestone: 2026-11-16
+* **Branch**: `feat/session-name-and-id-items`
+* **Status**: Complete & Verified (Separate `session_name` and `session_id` HUD Footer Items)
+
+---
+
+### [SESSION LOG: 2026-11-16 - Separate `session_name` & `session_id` Footer Items]
+* **Completed Objectives:**
+  - Wrote baseline characterization tests on existing code (`tests/hud_engine.test.js`, `tests/hud_web_gui.test.js`, `tests/hud_gui.test.ps1`) verifying workspace title isolation vs `conversation_title`, `session` uptime tiers, and 18-item GUI parity.
+  - Authored design specification (`docs/SPEC_SESSION_NAME_AND_ID.md`) and TDD failing tests prior to implementation.
+  - Implemented `session_name` (`🏷️ <conversation_title>`, truncated to 48/24/14 chars across `full`/`short`/`minimal`) and `session_id` (`🆔 <uuid>` full / `🆔 <8-char>` short / `<8-char>` minimal) in `bin/hud.js`, strictly decoupled from `workspace` (`📁`).
+  - Registered both items across `bin/hud_config.json`, `presets/4line_command_center.json`, `web/hud_gui.html`, `bin/hud_gui.ps1` (UTF-8 No-BOM verified), and `scripts/generate_docs.js` (`docs/TELEMETRY_ITEMS.md`, `docs/CONFIGURATION_SCHEMA.md`, `README.md` at 0% drift).
+
+---
+
 ## Session Milestone: 2026-09-19
 * **Branch**: `feat/quota-reset-datetime`
 * **Status**: Complete & Verified (Quota Reset Date/Time Display & Granular Window Formatting)

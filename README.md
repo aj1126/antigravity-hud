@@ -157,6 +157,8 @@ For detailed guides, architectural specifications, and full schemas:
 | **`quota_5h`** | 5-Hour Rolling Quota Reserve — Active 5-hour rolling token reserve percentage and countdown reset timer (`↻ 3h 14m`) | `Quota: 53% (↻ 3h 34m)` | `5h: 53%` |
 | **`quota_weekly`** | Weekly Quota Reserve — Weekly quota reserve percentage across Gemini (`gemini-argon-wtu-weekly` + `gemini-weekly` side-by-side) or 3P providers | `Wk(A): 64% / Wk(F): 100%` | `Wk(A): 64% / Wk(F): 100%` |
 | **`session`** | Session Elapsed Uptime — Color-graded elapsed time since session start with optional seconds display and configurable threshold bands | `⏱️ 1h 24m 15s` | `⏱️ 84m` |
+| **`session_name`** | Session Name (Title) — Active Antigravity session title (`conversation_title`) rendered independently of the workspace directory badge | `🏷️ MasterControlCenter_SitStu_Nov2026` | `MasterControl…` |
+| **`session_id`** | Session UUID — Active session or conversation identifier rendered as a dedicated footer item | `🆔 c4389f31-ea6b-4188-92ac-49962cf376ef` | `c4389f31` |
 | **`mcp`** | Registered MCP Servers — Count of connected Model Context Protocol (MCP) tool servers | `🔌 15 MCP` | `🔌 15` |
 | **`tasks`** | Running Background Tasks — Count of active, uncompleted background subshell tasks | `⚙️ 2 tasks` | `⚙️ 2` |
 | **`subagents`** | Active Subagents — Count of running background subagents and specialized workers | `🤖 1 subagent` | `🤖 1` |

@@ -59,6 +59,8 @@ $itemMeta = [ordered]@{
     'auth'         = 'Auth Provider Badge'
     'sandbox'      = 'Sandbox Mode Indicator'
     'session'      = 'Session Uptime Duration'
+    'session_name' = 'Session Name (Title)'
+    'session_id'   = 'Session UUID'
     'context'      = 'Context Window & Cache Hit'
     'fork'         = 'Fork Advisory Milestone'
     'quota_5h'     = '5-Hour Quota & Reset'
@@ -81,6 +83,8 @@ $previewText = @{
     'auth'         = @{ full = 'Auth: API-Key'; short = 'API-Key'; minimal = 'KEY' }
     'sandbox'      = @{ full = 'Sandbox: ON'; short = 'SBX'; minimal = 'SB' }
     'session'      = @{ full = '24m 15s'; short = '24m'; minimal = '24m' }
+    'session_name' = @{ full = '🏷️ MasterControlCenter_SitStu_Nov2026'; short = '🏷️ MasterControlCenter_Sit…'; minimal = 'MasterControl…' }
+    'session_id'   = @{ full = '🆔 c4389f31-ea6b-4188-92ac-49962cf376ef'; short = '🆔 c4389f31'; minimal = 'c4389f31' }
     'context'      = @{ full = 'Ctx: 14% (143k) Cache: 91%'; short = '14% (91%C)'; minimal = '14%' }
     'fork'         = @{ full = 'Fork @ 60%'; short = 'Fork: 60%'; minimal = 'F60' }
     'quota_5h'     = @{ full = 'Quota: 56% (reset 2h 23m)'; short = '56% 2h23m'; minimal = '56%' }

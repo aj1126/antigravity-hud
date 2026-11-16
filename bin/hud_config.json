@@ -23,7 +23,9 @@
   ],
   "line4": [
     "sandbox",
-    "auth"
+    "auth",
+    "session_name",
+    "session_id"
   ],
   "disabled": [
     "session",

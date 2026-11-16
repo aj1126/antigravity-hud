@@ -183,6 +183,8 @@
     .term-auth { color: #9ca3af; }
     .term-sandbox { color: #34d399; }
     .term-session { color: #9ca3af; }
+    .term-session-name { color: #e879f9; font-weight: 600; }
+    .term-session-id { color: #9ca3af; }
     .term-ctx { color: #38bdf8; }
     .term-bar { color: #60a5fa; }
     .term-cache { color: #9ca3af; }
@@ -482,6 +484,8 @@
       auth: { label: '🔑 Auth Type', desc: 'Authentication provider badge' },
       sandbox: { label: '🛡️ Sandbox', desc: 'Container sandbox security status' },
       session: { label: '⏱️ Session Uptime', desc: 'Live session duration & color timer' },
+      session_name: { label: '🏷️ Session Name', desc: 'Active conversation / session title' },
+      session_id: { label: '🆔 Session ID', desc: 'Active session or conversation UUID' },
       context: { label: '📊 Context Window', desc: 'Progress bar, token count & cache rate' },
       fork: { label: '🍴 Fork Advisory', desc: 'Clean-state milestone /fork advisor' },
       quota_5h: { label: '⏳ 5h Quota', desc: '5-hour reserve % & reset countdown' },
@@ -683,6 +687,14 @@
           if (st === 'minimal') return '<span class="term-session">⏱️ 84m</span>';
           if (st === 'short') return '<span class="term-session">⏱️ 1h 24m</span>';
           return '<span class="term-session">⏱️ 1h 24m 15s</span>';
+        case 'session_name':
+          if (st === 'minimal') return '<span class="term-session-name">MasterControl…</span>';
+          if (st === 'short') return '<span class="term-session-name">🏷️ MasterControlCenter_Sit…</span>';
+          return '<span class="term-session-name">🏷️ MasterControlCenter_SitStu_Nov2026</span>';
+        case 'session_id':
+          if (st === 'minimal') return '<span class="term-session-id">c4389f31</span>';
+          if (st === 'short') return '<span class="term-session-id">🆔 c4389f31</span>';
+          return '<span class="term-session-id">🆔 c4389f31-ea6b-4188-92ac-49962cf376ef</span>';
         case 'context':
           if (st === 'minimal') return '<span class="term-ctx">Ctx: 22%</span>';
           if (st === 'short') return '<span class="term-ctx">Ctx: <span class="term-bar">██░░</span> 22% <span class="term-cache">(⚡ 93%)</span></span>';

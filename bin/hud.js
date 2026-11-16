@@ -16,7 +16,7 @@ const DEFAULT_CONFIG = {
   line1: ['workspace', 'git_status', 'model', 'state', 'auth', 'sandbox', 'session'],
   line2: ['context', 'fork', 'quota_5h', 'quota_weekly', 'credits', 'mcp', 'subagents', 'tasks', 'artifacts', 'queue'],
   line3: [],
-  line4: [],
+  line4: ['session_name', 'session_id'],
   disabled: ['plan_tier'],
   item_styles: {},
   session_uptime: {
@@ -1780,6 +1780,8 @@ if (args.length > 0) {
     console.log('  • \x1b[32mauth\x1b[0m          🔑 Authentication provider badge (API-Key/OAuth)');
     console.log('  • \x1b[32msandbox\x1b[0m       🛡️ Sandbox mode status');
     console.log('  • \x1b[32msession\x1b[0m       ⏱️ Live session duration & uptime');
+    console.log('  • \x1b[32msession_name\x1b[0m  🏷️ Active session title (conversation_title)');
+    console.log('  • \x1b[32msession_id\x1b[0m    🆔 Active session / conversation UUID');
     console.log('  • \x1b[32mcontext\x1b[0m       Ctx: progress bar, % used & prompt cache rate');
     console.log('  • \x1b[32mfork\x1b[0m          🍴 Milestone & step fork advisory badge (snoozeable)');
     console.log('  • \x1b[32mquota_5h\x1b[0m      Quota: 5-hour reserve % & reset time');
@@ -2596,6 +2598,36 @@ function getLocalAiSegment(payload, style = 'full') {
   return `\x1b[36m⚡ ${modelName} (${formattedStatus})\x1b[0m`;
 }
 
+function truncateWithEllipsis(text, maxLen) {
+  if (!text || text.length <= maxLen) return text || '';
+  return text.slice(0, Math.max(1, maxLen - 1)) + '…';
+}
+
+function getSessionNameSegment(payload, style = 'full') {
+  const rawName = String(payload.conversation_title || payload.session_title || payload.title || '').trim();
+  if (!rawName) return '';
+  if (style === 'minimal') {
+    return `\x1b[95m${truncateWithEllipsis(rawName, 14)}\x1b[0m`;
+  }
+  if (style === 'short') {
+    return `\x1b[95m🏷️ ${truncateWithEllipsis(rawName, 24)}\x1b[0m`;
+  }
+  return `\x1b[95m🏷️ ${truncateWithEllipsis(rawName, 48)}\x1b[0m`;
+}
+
+function getSessionIdSegment(payload, style = 'full') {
+  const rawId = String(payload.session_id || payload.conversation_id || payload.thread_id || '').trim();
+  if (!rawId) return '';
+  const shortId = rawId.slice(0, 8);
+  if (style === 'minimal') {
+    return `\x1b[90m${shortId}\x1b[0m`;
+  }
+  if (style === 'short') {
+    return `\x1b[90m🆔 ${shortId}\x1b[0m`;
+  }
+  return `\x1b[90m🆔 ${rawId}\x1b[0m`;
+}
+
 function getSessionUptime(payload) {
   if (typeof payload.session_duration_seconds === 'number' && payload.session_duration_seconds > 0) {
     return payload.session_duration_seconds;
@@ -2922,7 +2954,7 @@ process.stdin.on('end', () => {
       queued = queueCount > 0 ? `\x1b[36m⏳ ${queueCount}\x1b[0m` : '';
     }
 
-    // 9. Session Runtime
+    // 9. Session Runtime, Name & ID
     let sessionSegment = '';
     if (activeItemSet.has('session')) {
       const stSess = resolveItemStyle('session', cfg, width);
@@ -2933,6 +2965,18 @@ process.stdin.on('end', () => {
         const col = getUptimeColor(sessionSec, uptimeCfg.thresholds);
         sessionSegment = `${col}⏱️ ${formatDuration(sessionSec, showSec, stSess)}\x1b[0m`;
       }
+    }
+
+    let sessionNameSegment = '';
+    if (activeItemSet.has('session_name')) {
+      const stSessName = resolveItemStyle('session_name', cfg, width);
+      sessionNameSegment = getSessionNameSegment(payload, stSessName);
+    }
+
+    let sessionIdSegment = '';
+    if (activeItemSet.has('session_id')) {
+      const stSessId = resolveItemStyle('session_id', cfg, width);
+      sessionIdSegment = getSessionIdSegment(payload, stSessId);
     }
 
     // 10. Auth & Sandbox Badges
@@ -3012,6 +3056,8 @@ process.stdin.on('end', () => {
       auth: authSegment,
       sandbox: sandboxSegment,
       session: sessionSegment,
+      session_name: sessionNameSegment,
+      session_id: sessionIdSegment,
       context: ctxSegment,
       fork: forkSegment,
       fork_advisory: forkSegment,
