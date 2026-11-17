@@ -71,9 +71,28 @@ runTest('PreToolGuard: allows standard non-destructive development commands', ()
 });
 
 // 5. Pre-Tool Guard: Quota Monitor Advisory
-runTest('PreToolGuard: evaluates quota threshold without crashing', () => {
+runTest('PreToolGuard: evaluates quota threshold without crashing and emits LOW_QUOTA_WARNING when weekly quota < 15%', () => {
   const evalRes = evaluateCommand('git commit -m "test"');
   assert.strictEqual(evalRes.safe, true);
+
+  const testQuotaFile = path.join(sandboxDir, 'test_low_quota.json');
+  fs.writeFileSync(testQuotaFile, JSON.stringify({
+    q5hPercent: 85,
+    qWkPercent: 12,
+    qArgonWkPercent: 12,
+    qFlashWkPercent: 100,
+    updatedAt: Date.now()
+  }), 'utf8');
+  const prevEnv = process.env.HUD_TEST_QUOTA_FILE;
+  process.env.HUD_TEST_QUOTA_FILE = testQuotaFile;
+  try {
+    const lowWkRes = evaluateCommand('git status');
+    assert.strictEqual(lowWkRes.safe, true);
+    assert(lowWkRes.warning && lowWkRes.warning.includes('Weekly Quota Low (Wk: 12% remaining)'), `Expected Weekly Quota Low message, got: ${lowWkRes.warning}`);
+  } finally {
+    if (prevEnv === undefined) delete process.env.HUD_TEST_QUOTA_FILE;
+    else process.env.HUD_TEST_QUOTA_FILE = prevEnv;
+  }
 });
 
 // 6. Session Start Hook: Execution

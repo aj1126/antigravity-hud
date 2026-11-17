@@ -60,5 +60,5 @@ flowchart TD
    - Inspects terminal column width and per-item style overrides (`item_styles`).
    - Renders 1 to 4 configurable lines delimited by custom separators (`│`).
 4. **ANSI Emission & Tab Synchronization:**
-   - Broadcasts ANSI OSC 0 escape sequences (`\x1b]0;[agy] <workspace>\x07`) to dynamically label Windows Terminal tabs.
+   - Broadcasts ANSI OSC 0 escape sequences (`\x1b]0;🪐 agy - <workspace>\x07`) to dynamically label Windows Terminal tabs.
    - Emits formatted multi-line statusline to `process.stdout` in **< 15 milliseconds**.

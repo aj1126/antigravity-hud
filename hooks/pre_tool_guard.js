@@ -38,15 +38,18 @@ function evaluateCommand(cmd) {
     }
   }
 
-  // 2. Check Quota Thresholds
-  const quotaFile = path.join(homeDir, '.gemini', 'tmp', 'last_quota.json');
+  // 2. Check Quota Thresholds (5h rolling and active weekly WTU / standard pool)
+  const quotaFile = process.env.HUD_TEST_QUOTA_FILE || path.join(homeDir, '.gemini', 'tmp', 'last_quota.json');
   let quotaWarning = null;
   if (fs.existsSync(quotaFile)) {
     try {
       const quota = JSON.parse(fs.readFileSync(quotaFile, 'utf8'));
-      const percentLeft = quota.q5hPercent ?? quota.percent_remaining ?? quota.remaining_percentage;
-      if (typeof percentLeft === 'number' && percentLeft < 15) {
-        quotaWarning = `Quota Low (${percentLeft}% remaining). Suggest reasoning effort adjustment (/effort low).`;
+      const percent5h = quota.q5hPercent ?? quota.percent_remaining ?? quota.remaining_percentage;
+      const percentWk = quota.qWkPercent ?? quota.qArgonWkPercent ?? quota.qFlashWkPercent;
+      if (typeof percent5h === 'number' && percent5h < 15) {
+        quotaWarning = `Quota Low (5h: ${percent5h}% remaining). Suggest reasoning effort adjustment (/effort low).`;
+      } else if (typeof percentWk === 'number' && percentWk < 15) {
+        quotaWarning = `Weekly Quota Low (Wk: ${percentWk}% remaining). Suggest reasoning effort adjustment (/effort low) or model switch.`;
       }
     } catch (_) {}
   }

@@ -132,7 +132,7 @@ runTest('CLI: hud toggle, enable, disable items', () => {
 runTest('CLI: hud title sets custom title and clears on reset', () => {
   let res = spawnSync('node', [hudScriptPath, 'title', 'Feature Test Branch'], { env, encoding: 'utf8' });
   assert.strictEqual(res.status, 0);
-  assert(res.stdout.includes('\x1b]0;[agy] Feature Test Branch\x07'), 'Expected OSC 0 sequence');
+  assert(res.stdout.includes('\x1b]0;\u{1FA90} agy - Feature Test Branch\x07'), 'Expected OSC 0 sequence');
 
   res = spawnSync('node', [hudScriptPath, 'title', 'reset'], { env, encoding: 'utf8' });
   assert.strictEqual(res.status, 0);
@@ -151,7 +151,7 @@ runTest('Engine: stdio pipeline renders 4-line telemetry with mock payload', () 
     encoding: 'utf8'
   });
   assert.strictEqual(res.status, 0);
-  assert(res.stdout.includes('\x1b]0;[agy] '), 'Must emit OSC 0 tab title');
+  assert(res.stdout.includes('\x1b]0;\u{1FA90} agy - '), 'Must emit OSC 0 tab title');
   const lines = res.stdout.replace(/^\x1b\]0;[^\x07]+\x07/, '').split('\n');
   assert.strictEqual(lines.length, 4, `Expected 4 rendered lines, got ${lines.length}`);
   
@@ -271,6 +271,340 @@ runTest('Engine: zero-quota conditions apply alert highlight to credits segment'
   assert(res.stdout.includes('[0Q Active]'), 'Expected [0Q Active] tag when quota is 0');
   const clean = stripAnsi(res.stdout);
   assert(clean.includes('💳 1,850 Credits [0Q Active]'), 'Expected formatted zero-quota alert string');
+});
+
+// 15. Gemini 4 Argon Model Badges, Dual Weekly Quota Wk(A)/Wk(F), Cache Isolation & Active-Model 0Q
+runTest('Engine: Gemini 4 Argon renders full/short/minimal badges, dual Wk(A)/Wk(F) quota, and active-model 0Q', () => {
+  const payloadStr = fs.readFileSync(fixturePayloadPath, 'utf8');
+  const payload = JSON.parse(payloadStr);
+  payload.model = {
+    id: 'gemini-4-argon',
+    display_name: 'Gemini 4 Argon (High)'
+  };
+  payload.rate_limits = {
+    'gemini-5h': { remaining_percentage: 100, reset_in_seconds: 18000 },
+    'gemini-argon-wtu-weekly': { remaining_percentage: 64, reset_in_seconds: 182700 },
+    'gemini-weekly': { remaining_percentage: 100, reset_in_seconds: 604800 }
+  };
+  delete payload.quota;
+  payload.credits = 2000;
+
+  const testQuotaCache = path.join(tempTestDir, 'test_argon_last_quota.json');
+  const envWithQuotaFile = Object.assign({}, env, { HUD_TEST_QUOTA_FILE: testQuotaCache });
+
+  // 15a. Full mode
+  const fullCfg = JSON.parse(fs.readFileSync(fixtureCfgPath, 'utf8'));
+  fullCfg.item_styles = Object.assign({}, fullCfg.item_styles, { model: 'full' });
+  fs.writeFileSync(testConfigPath, JSON.stringify(fullCfg, null, 2), 'utf8');
+  let res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  assert.strictEqual(res.status, 0);
+  let clean = stripAnsi(res.stdout);
+  assert(clean.includes('Gemini 4 Argon [🧠 HIGH]'), `Expected full Argon badge, got: ${clean}`);
+  assert(clean.includes('Wk(A): 64% / Wk(F): 100%'), `Expected dual Wk(A)/Wk(F) segment, got: ${clean}`);
+  assert(!clean.includes('[0Q Active]'), 'Should not trigger 0Q when Argon weekly is 64%');
+
+  // Verify HUD_TEST_QUOTA_FILE persisted dual weekly fields
+  assert(fs.existsSync(testQuotaCache), 'HUD_TEST_QUOTA_FILE should be written');
+  const cachedQuota = JSON.parse(fs.readFileSync(testQuotaCache, 'utf8'));
+  assert.strictEqual(cachedQuota.qArgonWkPercent, 64);
+  assert.strictEqual(cachedQuota.qFlashWkPercent, 100);
+
+  // 15b. Short mode -> Argon [HI]
+  const shortCfg = JSON.parse(fs.readFileSync(fixtureCfgPath, 'utf8'));
+  shortCfg.item_styles = Object.assign({}, shortCfg.item_styles, { model: 'short' });
+  fs.writeFileSync(testConfigPath, JSON.stringify(shortCfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('Argon [HI]'), `Expected short Argon [HI] badge, got: ${clean}`);
+
+  // 15c. Minimal mode -> Argon
+  const minCfg = JSON.parse(fs.readFileSync(fixtureCfgPath, 'utf8'));
+  minCfg.item_styles = Object.assign({}, minCfg.item_styles, { model: 'minimal' });
+  fs.writeFileSync(testConfigPath, JSON.stringify(minCfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('Argon │'), `Expected minimal Argon badge, got: ${clean}`);
+
+  // 15d. Active-model 0Q when Argon weekly is 0% (even though Flash weekly is 100%)
+  fs.copyFileSync(fixtureCfgPath, testConfigPath);
+  payload.rate_limits['gemini-argon-wtu-weekly'].remaining_percentage = 0;
+  res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('[0Q Active]'), 'Expected [0Q Active] when Argon is active and Argon weekly is 0%');
+});
+
+// 16. Gemini 4 Hydrogen Model Badges (incl. XHigh) & Standard/Flash Weekly Quota Binding
+runTest('Engine: Gemini 4 Hydrogen binds to gemini-weekly (not Argon WTU) and renders full/short/minimal badges', () => {
+  const payloadStr = fs.readFileSync(fixturePayloadPath, 'utf8');
+  const payload = JSON.parse(payloadStr);
+  payload.model = {
+    id: 'gemini-4-hydrogen-xhigh',
+    display_name: 'Gemini 4 Hydrogen (XHigh)',
+    effort: 'xhigh'
+  };
+  payload.rate_limits = {
+    'gemini-5h': { remaining_percentage: 100, reset_in_seconds: 18000 },
+    'gemini-argon-wtu-weekly': { remaining_percentage: 100, reset_in_seconds: 604800 },
+    'gemini-weekly': { remaining_percentage: 87, reset_in_seconds: 114390 }
+  };
+  delete payload.quota;
+  payload.credits = 2000;
+
+  const testQuotaCache = path.join(tempTestDir, 'test_hydrogen_last_quota.json');
+  const envWithQuotaFile = Object.assign({}, env, { HUD_TEST_QUOTA_FILE: testQuotaCache });
+
+  // 16a. Full mode + qWkPercent binds to Flash/standard weekly pool (87), not Argon (100)
+  const fullCfg = JSON.parse(fs.readFileSync(fixtureCfgPath, 'utf8'));
+  fullCfg.item_styles = Object.assign({}, fullCfg.item_styles, { model: 'full' });
+  fs.writeFileSync(testConfigPath, JSON.stringify(fullCfg, null, 2), 'utf8');
+  let res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  assert.strictEqual(res.status, 0);
+  let clean = stripAnsi(res.stdout);
+  assert(clean.includes('Gemini 4 Hydrogen [🧠 XHIGH]'), `Expected full Hydrogen badge, got: ${clean}`);
+  assert(clean.includes('Wk(A): 100% / Wk(F): 87%'), `Expected dual Wk(A)/Wk(F) segment, got: ${clean}`);
+  assert(!clean.includes('[0Q Active]'), 'Should not trigger 0Q when Hydrogen/Flash weekly is 87%');
+
+  const cachedQuota = JSON.parse(fs.readFileSync(testQuotaCache, 'utf8'));
+  assert.strictEqual(cachedQuota.qWkPercent, 87, 'Primary qWkPercent for Hydrogen must bind to gemini-weekly (87), not Argon WTU (100)');
+  assert.strictEqual(cachedQuota.qArgonWkPercent, 100);
+  assert.strictEqual(cachedQuota.qFlashWkPercent, 87);
+
+  // 16b. Short mode -> Hydrogen [XHI]
+  const shortCfg = JSON.parse(fs.readFileSync(fixtureCfgPath, 'utf8'));
+  shortCfg.item_styles = Object.assign({}, shortCfg.item_styles, { model: 'short' });
+  fs.writeFileSync(testConfigPath, JSON.stringify(shortCfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('Hydrogen [XHI]'), `Expected short Hydrogen [XHI] badge, got: ${clean}`);
+
+  // 16c. Minimal mode -> Hydrogen
+  const minCfg = JSON.parse(fs.readFileSync(fixtureCfgPath, 'utf8'));
+  minCfg.item_styles = Object.assign({}, minCfg.item_styles, { model: 'minimal' });
+  fs.writeFileSync(testConfigPath, JSON.stringify(minCfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('Hydrogen │'), `Expected minimal Hydrogen badge, got: ${clean}`);
+
+  // 16d. Active-model 0Q does NOT trigger if only Argon WTU is 0%, and DOES trigger when gemini-weekly is 0%
+  fs.copyFileSync(fixtureCfgPath, testConfigPath);
+  payload.rate_limits['gemini-argon-wtu-weekly'].remaining_percentage = 0;
+  payload.rate_limits['gemini-weekly'].remaining_percentage = 87;
+  res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  clean = stripAnsi(res.stdout);
+  assert(!clean.includes('[0Q Active]'), 'Should NOT trigger [0Q Active] for Hydrogen when only Argon WTU is 0%');
+
+  payload.rate_limits['gemini-argon-wtu-weekly'].remaining_percentage = 100;
+  payload.rate_limits['gemini-weekly'].remaining_percentage = 0;
+  res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('[0Q Active]'), 'Expected [0Q Active] for Hydrogen when gemini-weekly is 0%');
+});
+
+// 17. Baseline Characterization: Workspace Custom Title Isolation vs conversation_title
+runTest('Baseline: hud title overrides workspace 📁 badge in isolated HOME without using payload.conversation_title', () => {
+  const isolatedHome = path.join(tempTestDir, 'isolated_home_title');
+  const isoCfg = path.join(isolatedHome, 'hud_config.json');
+  fs.mkdirSync(isolatedHome, { recursive: true });
+  fs.copyFileSync(fixtureCfgPath, isoCfg);
+
+  const isoEnv = {
+    ...process.env,
+    USERPROFILE: isolatedHome,
+    HOME: isolatedHome,
+    HUD_TEST_MODE: '1',
+    HUD_CONFIG_PATH: isoCfg
+  };
+
+  // Without custom title, conversation_title must NOT override the 📁 workspace label
+  const payload = JSON.parse(fs.readFileSync(fixturePayloadPath, 'utf8'));
+  payload.conversation_title = 'Session_Only_Name';
+  let res = spawnSync('node', [hudScriptPath], { input: JSON.stringify(payload), env: isoEnv, encoding: 'utf8' });
+  assert.strictEqual(res.status, 0);
+  let clean = stripAnsi(res.stdout);
+  assert(clean.includes('📁 antigravity-hud'), `Expected workspace folder name, got: ${clean}`);
+  assert(!clean.includes('📁 Session_Only_Name'), 'conversation_title must not hijack workspace 📁 badge');
+
+  // With hud title, workspace_titles.json overrides 📁 badge and emits OSC 0
+  res = spawnSync('node', [hudScriptPath, 'title', 'Pinned Workspace Name'], { env: isoEnv, encoding: 'utf8', cwd: path.resolve(__dirname, '..') });
+  assert.strictEqual(res.status, 0);
+  const titlesPath = path.join(isolatedHome, '.gemini', 'tmp', 'workspace_titles.json');
+  assert(fs.existsSync(titlesPath), 'workspace_titles.json must be created in isolated HOME');
+
+  res = spawnSync('node', [hudScriptPath], { input: JSON.stringify(payload), env: isoEnv, encoding: 'utf8' });
+  assert.strictEqual(res.status, 0);
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('📁 Pinned Workspace Name'), `Expected custom workspace title in 📁 badge, got: ${clean}`);
+  assert(res.stdout.includes('\x1b]0;\u{1FA90} agy - Pinned Workspace Name\x07'), 'Expected OSC 0 tab title');
+
+  // Reset restores directory name
+  res = spawnSync('node', [hudScriptPath, 'title', 'reset'], { env: isoEnv, encoding: 'utf8', cwd: path.resolve(__dirname, '..') });
+  assert.strictEqual(res.status, 0);
+  res = spawnSync('node', [hudScriptPath], { input: JSON.stringify(payload), env: isoEnv, encoding: 'utf8' });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('📁 antigravity-hud'), `Expected reset to restore folder name, got: ${clean}`);
+});
+
+// 18. Baseline Characterization: Session Uptime Formatting Tiers & show_seconds Toggle
+runTest('Baseline: session uptime renders full/short/minimal durations and honors show_seconds=false', () => {
+  const payloadStr = fs.readFileSync(fixturePayloadPath, 'utf8');
+  let cfg = JSON.parse(fs.readFileSync(fixtureCfgPath, 'utf8'));
+
+  // Full mode (1845s = 30m 45s)
+  cfg.item_styles = { session: 'full' };
+  fs.writeFileSync(testConfigPath, JSON.stringify(cfg, null, 2), 'utf8');
+  let res = spawnSync('node', [hudScriptPath], { input: payloadStr, env, encoding: 'utf8' });
+  assert.strictEqual(res.status, 0);
+  let clean = stripAnsi(res.stdout);
+  assert(clean.includes('⏱️ 30m 45s'), `Expected full uptime ⏱️ 30m 45s, got: ${clean}`);
+
+  // Short mode -> ⏱️ 30m
+  cfg.item_styles = { session: 'short' };
+  fs.writeFileSync(testConfigPath, JSON.stringify(cfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], { input: payloadStr, env, encoding: 'utf8' });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('⏱️ 30m') && !clean.includes('⏱️ 30m 45s'), `Expected short uptime ⏱️ 30m, got: ${clean}`);
+
+  // Full mode with show_seconds: false -> ⏱️ 30m
+  cfg.item_styles = { session: 'full' };
+  cfg.session_uptime.show_seconds = false;
+  fs.writeFileSync(testConfigPath, JSON.stringify(cfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], { input: payloadStr, env, encoding: 'utf8' });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('⏱️ 30m') && !clean.includes('⏱️ 30m 45s'), `Expected show_seconds=false to omit seconds, got: ${clean}`);
+});
+
+// 19. Baseline Characterization: Existing auth, sandbox, and plan_tier Rendering
+runTest('Baseline: auth, sandbox, and plan_tier render expected badges when enabled', () => {
+  const payload = JSON.parse(fs.readFileSync(fixturePayloadPath, 'utf8'));
+  payload.auth_type = 'gemini-api-key';
+  const cfg = JSON.parse(fs.readFileSync(fixtureCfgPath, 'utf8'));
+  cfg.disabled = [];
+  cfg.line4 = ['auth', 'sandbox', 'plan_tier'];
+  cfg.item_styles = { auth: 'full', sandbox: 'full', plan_tier: 'full' };
+  fs.writeFileSync(testConfigPath, JSON.stringify(cfg, null, 2), 'utf8');
+
+  let res = spawnSync('node', [hudScriptPath], { input: JSON.stringify(payload), env, encoding: 'utf8' });
+  assert.strictEqual(res.status, 0);
+  let clean = stripAnsi(res.stdout);
+  assert(clean.includes('🔑 API-Key'), `Expected auth badge, got: ${clean}`);
+  assert(clean.includes('🛡️ Sandbox'), `Expected sandbox badge, got: ${clean}`);
+  assert(clean.includes('✨ Google AI Pro'), `Expected plan_tier badge, got: ${clean}`);
+});
+
+// 20. TDD Spec: session_name Footer Item (full / short / minimal / truncation / empty-hidden)
+runTest('TDD: session_name renders conversation_title across tiers and hides when empty', () => {
+  const payload = JSON.parse(fs.readFileSync(fixturePayloadPath, 'utf8'));
+  const cfg = JSON.parse(fs.readFileSync(fixtureCfgPath, 'utf8'));
+  cfg.disabled = [];
+  cfg.line4 = ['session_name'];
+
+  // Untitled/empty payload -> omitted cleanly
+  delete payload.conversation_title;
+  delete payload.session_title;
+  delete payload.title;
+  cfg.item_styles = { session_name: 'full' };
+  fs.writeFileSync(testConfigPath, JSON.stringify(cfg, null, 2), 'utf8');
+  let res = spawnSync('node', [hudScriptPath], { input: JSON.stringify(payload), env, encoding: 'utf8' });
+  assert.strictEqual(res.status, 0);
+  let clean = stripAnsi(res.stdout);
+  assert(!clean.includes('🏷️'), `Empty conversation_title must not render 🏷️ badge, got: ${clean}`);
+
+  // Short title across full / short / minimal
+  payload.conversation_title = 'MasterControlCenter_SitStu_Nov2026';
+  fs.writeFileSync(testConfigPath, JSON.stringify(cfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], { input: JSON.stringify(payload), env, encoding: 'utf8' });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('🏷️ MasterControlCenter_SitStu_Nov2026'), `Expected full session_name, got: ${clean}`);
+  assert(clean.includes('📁 antigravity-hud'), 'workspace 📁 must stay independent of session_name');
+
+  cfg.item_styles = { session_name: 'short' };
+  fs.writeFileSync(testConfigPath, JSON.stringify(cfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], { input: JSON.stringify(payload), env, encoding: 'utf8' });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('🏷️ MasterControlCenter_Sit…'), `Expected truncated short session_name (<=24 chars), got: ${clean}`);
+
+  cfg.item_styles = { session_name: 'minimal' };
+  fs.writeFileSync(testConfigPath, JSON.stringify(cfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], { input: JSON.stringify(payload), env, encoding: 'utf8' });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('MasterControl…') && !clean.includes('🏷️'), `Expected minimal truncated session_name without icon, got: ${clean}`);
+});
+
+// 21. TDD Spec: session_id Footer Item (full UUID / short 8-char / minimal 8-char / empty-hidden)
+runTest('TDD: session_id renders full UUID in full mode, 8-char prefix in short/minimal, and hides when empty', () => {
+  const payload = JSON.parse(fs.readFileSync(fixturePayloadPath, 'utf8'));
+  const cfg = JSON.parse(fs.readFileSync(fixtureCfgPath, 'utf8'));
+  cfg.disabled = [];
+  cfg.line4 = ['session_id'];
+
+  // Full mode -> 🆔 + full ID
+  payload.session_id = 'c4389f31-ea6b-4188-92ac-49962cf376ef';
+  cfg.item_styles = { session_id: 'full' };
+  fs.writeFileSync(testConfigPath, JSON.stringify(cfg, null, 2), 'utf8');
+  let res = spawnSync('node', [hudScriptPath], { input: JSON.stringify(payload), env, encoding: 'utf8' });
+  assert.strictEqual(res.status, 0);
+  let clean = stripAnsi(res.stdout);
+  assert(clean.includes('🆔 c4389f31-ea6b-4188-92ac-49962cf376ef'), `Expected full session_id, got: ${clean}`);
+
+  // Short mode -> 🆔 c4389f31
+  cfg.item_styles = { session_id: 'short' };
+  fs.writeFileSync(testConfigPath, JSON.stringify(cfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], { input: JSON.stringify(payload), env, encoding: 'utf8' });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('🆔 c4389f31') && !clean.includes('49962cf376ef'), `Expected 8-char short session_id, got: ${clean}`);
+
+  // Minimal mode -> c4389f31 (no icon)
+  cfg.item_styles = { session_id: 'minimal' };
+  fs.writeFileSync(testConfigPath, JSON.stringify(cfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], { input: JSON.stringify(payload), env, encoding: 'utf8' });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('c4389f31') && !clean.includes('🆔'), `Expected minimal session_id without icon, got: ${clean}`);
+
+  // Missing IDs -> omitted cleanly
+  delete payload.session_id;
+  delete payload.conversation_id;
+  delete payload.thread_id;
+  cfg.item_styles = { session_id: 'full' };
+  fs.writeFileSync(testConfigPath, JSON.stringify(cfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], { input: JSON.stringify(payload), env, encoding: 'utf8' });
+  clean = stripAnsi(res.stdout);
+  assert(!clean.includes('🆔'), `Missing session_id must not render 🆔 badge, got: ${clean}`);
 });
 
 // Cleanup test scratch

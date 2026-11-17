@@ -1,5 +1,38 @@
 # Developer Log - Antigravity HUD (`antigravity-hud`)
 
+## Session Milestone: 2026-11-16
+* **Branch**: `feat/session-name-and-id-items`
+* **Status**: Complete & Verified (Separate `session_name` and `session_id` HUD Footer Items)
+
+---
+
+### [SESSION LOG: 2026-11-16 - Separate `session_name` & `session_id` Footer Items]
+* **Completed Objectives:**
+  - Wrote baseline characterization tests on existing code (`tests/hud_engine.test.js`, `tests/hud_web_gui.test.js`, `tests/hud_gui.test.ps1`) verifying workspace title isolation vs `conversation_title`, `session` uptime tiers, and 18-item GUI parity.
+  - Authored design specification (`docs/SPEC_SESSION_NAME_AND_ID.md`) and TDD failing tests prior to implementation.
+  - Implemented `session_name` (`🏷️ <conversation_title>`, truncated to 48/24/14 chars across `full`/`short`/`minimal`) and `session_id` (`🆔 <uuid>` full / `🆔 <8-char>` short / `<8-char>` minimal) in `bin/hud.js`, strictly decoupled from `workspace` (`📁`).
+  - Registered both items across `bin/hud_config.json`, `presets/4line_command_center.json`, `web/hud_gui.html`, `bin/hud_gui.ps1` (UTF-8 No-BOM verified), and `scripts/generate_docs.js` (`docs/TELEMETRY_ITEMS.md`, `docs/CONFIGURATION_SCHEMA.md`, `README.md` at 0% drift).
+
+---
+
+## Session Milestone: 2026-09-19
+* **Branch**: `feat/quota-reset-datetime`
+* **Status**: Complete & Verified (Quota Reset Date/Time Display & Granular Window Formatting)
+
+---
+
+### [SESSION LOG: 2026-09-19 - Quota Reset Date/Time Display Formatting]
+* **Completed Objectives:**
+  - Enhanced quota reset presentation in `bin/hud.js` to render exact reset timestamps rather than duration-only relative intervals (`in 3h 48m`).
+  - Implemented window-aware date/time formatting:
+    - **Hourly / 5-hour window**: Localized time only (e.g. `Quota: 86% (↻ 7:46 PM)`), preserving compact layout and visual simplicity.
+    - **Weekly window**: Localized short date and time (e.g. `Wk: 64% (↻ Sep 26 3:52 AM)`), providing exact day and time visibility for the long reset cycle.
+  - Implemented robust `formatResetDate(isoString, includeDate)` helper using `Date.toLocaleTimeString()` and `Date.toLocaleDateString()` with fallback regex parsing for edge-case formats.
+  - Synchronized across runtime targets: `~/.gemini/scripts/hud.js`, `~/.gemini/hud/hud.js`, and `B:\Repos\antigravity-hud\bin\hud.js` (SHA256 verified identical).
+  - Verified live render: `Quota: 86% (↻ 7:46 PM) │ Wk: 64% (↻ Sep 26 3:52 AM)`.
+
+---
+
 ## Session Milestone: 2026-09-04
 * **Branch**: `main`
 * **Status**: Complete & Verified (Zero-Quota Model Credits Telemetry & Dynamic 0Q Alert Integration)

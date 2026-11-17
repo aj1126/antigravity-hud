@@ -1,6 +1,6 @@
-# 🧩 Telemetry Metrics & Statusline Elements (16 Items)
+# 🧩 Telemetry Metrics & Statusline Elements (18 Items)
 
-The Antigravity HUD engine supports **16 real-time telemetry elements** across up to 4 configurable display tiers. Each element features adaptive rendering across `full`, `short`, and `minimal` text condensation modes.
+The Antigravity HUD engine supports **18 real-time telemetry elements** across up to 4 configurable display tiers. Each element features adaptive rendering across `full`, `short`, and `minimal` text condensation modes.
 
 ---
 
@@ -10,12 +10,14 @@ The Antigravity HUD engine supports **16 real-time telemetry elements** across u
 | :--- | :--- | :--- | :--- | :--- |
 | **`workspace`** | Workspace & Git Branch | Identity & Source Control | `📁 MyProject › Core (⎇ main * ↑1)` | `📁 Core` |
 | **`git_status`** | Git Clean / Dirty Status | Identity & Source Control | `🌿 Clean / ⚠️ Dirty (+1 ~2)` | `🌿 / ⚠️` |
-| **`model`** | Model & Reasoning Effort | Identity & Source Control | `Gemini 3.7 Flash [🧠 HIGH]` | `Flash` |
+| **`model`** | Model & Reasoning Effort | Identity & Source Control | `Gemini 4 Argon [🧠 HIGH]` | `Argon` |
 | **`state`** | Agent Lifecycle State | Identity & Source Control | `[WORKING]` | `● (colored)` |
 | **`context`** | Context Window & Prompt Cache | Resource Quotas & Telemetry | `Ctx: ██░░░░░░░░ 22% (229k tok) (⚡ 93% Cache)` | `Ctx: 22%` |
 | **`quota_5h`** | 5-Hour Rolling Quota Reserve | Resource Quotas & Telemetry | `Quota: 53% (↻ 3h 34m)` | `5h: 53%` |
-| **`quota_weekly`** | Weekly Quota Reserve | Resource Quotas & Telemetry | `Wk: 80%` | `80%` |
+| **`quota_weekly`** | Weekly Quota Reserve | Resource Quotas & Telemetry | `Wk(A): 64% / Wk(F): 100%` | `Wk(A): 64% / Wk(F): 100%` |
 | **`session`** | Session Elapsed Uptime | Resource Quotas & Telemetry | `⏱️ 1h 24m 15s` | `⏱️ 84m` |
+| **`session_name`** | Session Name (Title) | Identity & Source Control | `🏷️ MasterControlCenter_SitStu_Nov2026` | `MasterControl…` |
+| **`session_id`** | Session UUID | Identity & Source Control | `🆔 c4389f31-ea6b-4188-92ac-49962cf376ef` | `c4389f31` |
 | **`mcp`** | Registered MCP Servers | Background Workers & System | `🔌 15 MCP` | `🔌 15` |
 | **`tasks`** | Running Background Tasks | Background Workers & System | `⚙️ 2 tasks` | `⚙️ 2` |
 | **`subagents`** | Active Subagents | Background Workers & System | `🤖 1 subagent` | `🤖 1` |
@@ -53,13 +55,13 @@ Working directory state indicating whether uncommitted changes exist (`+staged`,
 
 #### `model` — Model & Reasoning Effort
 
-Active AI model display name and reasoning effort level (`[🧠 HIGH]`, `[🧠 LOW]`).
+Active AI model display name and reasoning effort level (`[🧠 HIGH]`, `[🧠 MED]`, `[🧠 LOW]`).
 
 * **Payload Data Path:** `payload.model.display_name, payload.model.effort`
-* **Full Mode Sample:** `Gemini 3.7 Flash [🧠 HIGH]`
-* **Short Mode Sample:** `Flash [HIGH]`
-* **Minimal Mode Sample:** `Flash`
-* **Behavior & Styling:** Minimal strips effort tag and simplifies name (e.g. `Flash`, `Sonnet`, `Opus`, `Pro`).
+* **Full Mode Sample:** `Gemini 4 Argon [🧠 HIGH]`
+* **Short Mode Sample:** `Argon [HI]`
+* **Minimal Mode Sample:** `Argon`
+* **Behavior & Styling:** Full strips duplicate parenthesized effort tags; Short uses compact `[HI]`/`[MED]`/`[LOW]`; Minimal simplifies to `Argon`, `Flash`, `Sonnet`, `Opus`, `Pro`.
 
 #### `state` — Agent Lifecycle State
 
@@ -70,6 +72,26 @@ Current agent execution state (`[WORKING]`, `[IDLE]`, `[WAITING]`, `[ERROR]`).
 * **Short Mode Sample:** `[WRK]`
 * **Minimal Mode Sample:** `● (colored)`
 * **Behavior & Styling:** Color coded: Green (`WORKING`), Cyan (`IDLE`), Yellow (`WAITING`), Red (`ERROR`).
+
+#### `session_name` — Session Name (Title)
+
+Active Antigravity session title (`conversation_title`) rendered independently of the workspace directory badge.
+
+* **Payload Data Path:** `payload.conversation_title, payload.session_title, payload.title`
+* **Full Mode Sample:** `🏷️ MasterControlCenter_SitStu_Nov2026`
+* **Short Mode Sample:** `🏷️ MasterControlCenter_Sit…`
+* **Minimal Mode Sample:** `MasterControl…`
+* **Behavior & Styling:** Bright magenta accent; hidden automatically when session has no title.
+
+#### `session_id` — Session UUID
+
+Active session or conversation identifier rendered as a dedicated footer item.
+
+* **Payload Data Path:** `payload.session_id, payload.conversation_id, payload.thread_id`
+* **Full Mode Sample:** `🆔 c4389f31-ea6b-4188-92ac-49962cf376ef`
+* **Short Mode Sample:** `🆔 c4389f31`
+* **Minimal Mode Sample:** `c4389f31`
+* **Behavior & Styling:** Muted gray metadata styling; full UUID in full mode, 8-char prefix in short/minimal modes.
 
 ### 📂 Resource Quotas & Telemetry
 
@@ -95,13 +117,13 @@ Active 5-hour rolling token reserve percentage and countdown reset timer (`↻ 3
 
 #### `quota_weekly` — Weekly Quota Reserve
 
-Weekly secondary quota reserve percentage across Gemini or 3P providers.
+Weekly quota reserve percentage across Gemini (`gemini-argon-wtu-weekly` + `gemini-weekly` side-by-side) or 3P providers.
 
-* **Payload Data Path:** `payload.quota["gemini-weekly"], payload.quota["3p-weekly"]`
-* **Full Mode Sample:** `Wk: 80%`
-* **Short Mode Sample:** `Wk: 80%`
-* **Minimal Mode Sample:** `80%`
-* **Behavior & Styling:** Suppressed when provider does not expose a weekly quota limit.
+* **Payload Data Path:** `payload.quota["gemini-argon-wtu-weekly"], payload.quota["gemini-weekly"], payload.quota["3p-weekly"]`
+* **Full Mode Sample:** `Wk(A): 64% / Wk(F): 100%`
+* **Short Mode Sample:** `Wk(A): 64% / Wk(F): 100%`
+* **Minimal Mode Sample:** `Wk(A): 64% / Wk(F): 100%`
+* **Behavior & Styling:** Renders both Argon WTU (`Wk(A)`) and Flash (`Wk(F)`) weekly pools side-by-side when both exist, with single-bucket `Wk:` fallback.
 
 #### `session` — Session Elapsed Uptime
 

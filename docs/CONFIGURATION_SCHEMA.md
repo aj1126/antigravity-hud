@@ -16,8 +16,7 @@ The Antigravity HUD configuration is stored in JSON format at `~/.gemini/scripts
     "workspace",
     "model",
     "state",
-    "tasks",
-    "credits"
+    "tasks"
   ],
   "line2": [
     "context",
@@ -29,47 +28,31 @@ The Antigravity HUD configuration is stored in JSON format at `~/.gemini/scripts
     "artifacts",
     "queue",
     "subagents",
-    "mcp",
-    "fork"
+    "mcp"
   ],
   "line4": [
     "sandbox",
-    "auth"
+    "auth",
+    "session_name",
+    "session_id"
   ],
   "disabled": [
-    "session"
+    "session",
+    "fork"
   ],
   "item_styles": {},
   "session_uptime": {
-    "show_seconds": true,
-    "thresholds": [
-      {
-        "max_minutes": 15,
-        "color": "green"
-      },
-      {
-        "max_minutes": 45,
-        "color": "yellow"
-      },
-      {
-        "max_minutes": 90,
-        "color": "magenta"
-      },
-      {
-        "max_minutes": null,
-        "color": "red"
-      }
-    ]
+    "show_seconds": true
   },
   "fork_advisory": {
-    "enabled": true,
-    "require_clean_git": true,
-    "warning_percent": 60,
     "alert_percent": 75,
     "critical_percent": 90,
-    "step_warning": 300,
+    "require_clean_git": true,
     "step_alert": 500,
-    "step_critical": 800
+    "step_critical": 800,
+    "step_warning": 300,
+    "warning_percent": 60,
+    "enabled": false
   }
 }
 ```
@@ -89,7 +72,7 @@ The Antigravity HUD configuration is stored in JSON format at `~/.gemini/scripts
 | `line1` | `array[string]` | `["workspace", "git_status", "model", "state"]` | Telemetry item keys assigned to Line 1 (Top). |
 | `line2` | `array[string]` | `["context", "quota_5h", "quota_weekly"]` | Telemetry item keys assigned to Line 2. |
 | `line3` | `array[string]` | `["mcp", "tasks", "subagents", "artifacts", "queue"]` | Telemetry item keys assigned to Line 3. |
-| `line4` | `array[string]` | `["sandbox", "auth", "session", "fork"]` | Telemetry item keys assigned to Line 4 (Bottom). |
+| `line4` | `array[string]` | `["sandbox", "auth", "session_name", "session_id"]` | Telemetry item keys assigned to Line 4 (Bottom). |
 | `disabled` | `array[string]` | `[]` | Explicitly disabled item keys suppressed from all lines. |
 | `item_styles` | `object` | `{}` | Per-item formatting overrides (e.g. `{"context": "short"}`). |
 | `session_uptime` | `object` | *(see below)* | Uptime display settings and color threshold bands. |

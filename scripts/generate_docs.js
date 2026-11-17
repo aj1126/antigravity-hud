@@ -277,12 +277,12 @@ const TELEMETRY_ITEMS = [
     key: 'model',
     category: 'Identity & Source Control',
     name: 'Model & Reasoning Effort',
-    description: 'Active AI model display name and reasoning effort level (`[🧠 HIGH]`, `[🧠 LOW]`).',
+    description: 'Active AI model display name and reasoning effort level (`[🧠 HIGH]`, `[🧠 MED]`, `[🧠 LOW]`).',
     payloadPath: 'payload.model.display_name, payload.model.effort',
-    fullSample: 'Gemini 3.7 Flash [🧠 HIGH]',
-    shortSample: 'Flash [HIGH]',
-    minimalSample: 'Flash',
-    stylingNotes: 'Minimal strips effort tag and simplifies name (e.g. `Flash`, `Sonnet`, `Opus`, `Pro`).'
+    fullSample: 'Gemini 4 Argon [🧠 HIGH]',
+    shortSample: 'Argon [HI]',
+    minimalSample: 'Argon',
+    stylingNotes: 'Full strips duplicate parenthesized effort tags; Short uses compact `[HI]`/`[MED]`/`[LOW]`; Minimal simplifies to `Argon`, `Flash`, `Sonnet`, `Opus`, `Pro`.'
   },
   {
     key: 'state',
@@ -321,12 +321,12 @@ const TELEMETRY_ITEMS = [
     key: 'quota_weekly',
     category: 'Resource Quotas & Telemetry',
     name: 'Weekly Quota Reserve',
-    description: 'Weekly secondary quota reserve percentage across Gemini or 3P providers.',
-    payloadPath: 'payload.quota["gemini-weekly"], payload.quota["3p-weekly"]',
-    fullSample: 'Wk: 80%',
-    shortSample: 'Wk: 80%',
-    minimalSample: '80%',
-    stylingNotes: 'Suppressed when provider does not expose a weekly quota limit.'
+    description: 'Weekly quota reserve percentage across Gemini (`gemini-argon-wtu-weekly` + `gemini-weekly` side-by-side) or 3P providers.',
+    payloadPath: 'payload.quota["gemini-argon-wtu-weekly"], payload.quota["gemini-weekly"], payload.quota["3p-weekly"]',
+    fullSample: 'Wk(A): 64% / Wk(F): 100%',
+    shortSample: 'Wk(A): 64% / Wk(F): 100%',
+    minimalSample: 'Wk(A): 64% / Wk(F): 100%',
+    stylingNotes: 'Renders both Argon WTU (`Wk(A)`) and Flash (`Wk(F)`) weekly pools side-by-side when both exist, with single-bucket `Wk:` fallback.'
   },
   {
     key: 'session',
@@ -338,6 +338,28 @@ const TELEMETRY_ITEMS = [
     shortSample: '⏱️ 1h 24m',
     minimalSample: '⏱️ 84m',
     stylingNotes: 'Color transitions: Green (<=15m) -> Yellow (<=45m) -> Magenta (<=90m) -> Red (>90m).'
+  },
+  {
+    key: 'session_name',
+    category: 'Identity & Source Control',
+    name: 'Session Name (Title)',
+    description: 'Active Antigravity session title (`conversation_title`) rendered independently of the workspace directory badge.',
+    payloadPath: 'payload.conversation_title, payload.session_title, payload.title',
+    fullSample: '🏷️ MasterControlCenter_SitStu_Nov2026',
+    shortSample: '🏷️ MasterControlCenter_Sit…',
+    minimalSample: 'MasterControl…',
+    stylingNotes: 'Bright magenta accent; hidden automatically when session has no title.'
+  },
+  {
+    key: 'session_id',
+    category: 'Identity & Source Control',
+    name: 'Session UUID',
+    description: 'Active session or conversation identifier rendered as a dedicated footer item.',
+    payloadPath: 'payload.session_id, payload.conversation_id, payload.thread_id',
+    fullSample: '🆔 c4389f31-ea6b-4188-92ac-49962cf376ef',
+    shortSample: '🆔 c4389f31',
+    minimalSample: 'c4389f31',
+    stylingNotes: 'Muted gray metadata styling; full UUID in full mode, 8-char prefix in short/minimal modes.'
   },
   {
     key: 'mcp',
@@ -519,9 +541,9 @@ ${categories.map(cat => `- [${cat}](#${cat.toLowerCase().replace(/[^a-z0-9]+/g, 
 function generateTelemetryItemsDoc() {
   const categories = [...new Set(TELEMETRY_ITEMS.map(i => i.category))];
 
-  let md = `# 🧩 Telemetry Metrics & Statusline Elements (16 Items)
+  let md = `# 🧩 Telemetry Metrics & Statusline Elements (${TELEMETRY_ITEMS.length} Items)
 
-The Antigravity HUD engine supports **16 real-time telemetry elements** across up to 4 configurable display tiers. Each element features adaptive rendering across \`full\`, \`short\`, and \`minimal\` text condensation modes.
+The Antigravity HUD engine supports **${TELEMETRY_ITEMS.length} real-time telemetry elements** across up to 4 configurable display tiers. Each element features adaptive rendering across \`full\`, \`short\`, and \`minimal\` text condensation modes.
 
 ---
 
@@ -589,7 +611,7 @@ ${cfgSample}
 | \`line1\` | \`array[string]\` | \`["workspace", "git_status", "model", "state"]\` | Telemetry item keys assigned to Line 1 (Top). |
 | \`line2\` | \`array[string]\` | \`["context", "quota_5h", "quota_weekly"]\` | Telemetry item keys assigned to Line 2. |
 | \`line3\` | \`array[string]\` | \`["mcp", "tasks", "subagents", "artifacts", "queue"]\` | Telemetry item keys assigned to Line 3. |
-| \`line4\` | \`array[string]\` | \`["sandbox", "auth", "session", "fork"]\` | Telemetry item keys assigned to Line 4 (Bottom). |
+| \`line4\` | \`array[string]\` | \`["sandbox", "auth", "session_name", "session_id"]\` | Telemetry item keys assigned to Line 4 (Bottom). |
 | \`disabled\` | \`array[string]\` | \`[]\` | Explicitly disabled item keys suppressed from all lines. |
 | \`item_styles\` | \`object\` | \`{}\` | Per-item formatting overrides (e.g. \`{"context": "short"}\`). |
 | \`session_uptime\` | \`object\` | *(see below)* | Uptime display settings and color threshold bands. |
@@ -759,7 +781,7 @@ flowchart TD
    - Inspects terminal column width and per-item style overrides (\`item_styles\`).
    - Renders 1 to 4 configurable lines delimited by custom separators (\`│\`).
 4. **ANSI Emission & Tab Synchronization:**
-   - Broadcasts ANSI OSC 0 escape sequences (\`\\x1b]0;[agy] <workspace>\\x07\`) to dynamically label Windows Terminal tabs.
+   - Broadcasts ANSI OSC 0 escape sequences (\`\\x1b]0;\u{1FA90} agy - <workspace>\\x07\`) to dynamically label Windows Terminal tabs.
    - Emits formatted multi-line statusline to \`process.stdout\` in **< 15 milliseconds**.
 `;
 
