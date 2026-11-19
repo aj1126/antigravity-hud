@@ -2,10 +2,11 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const assert = require('assert');
-const { execSync } = require('child_process');
+const { execSync, spawnSync } = require('child_process');
 
 const { formatFile, stripBom } = require('../hooks/post_tool_format.js');
 const { evaluateCommand } = require('../hooks/pre_tool_guard.js');
+const preToolGuardPath = path.join(__dirname, '..', 'hooks', 'pre_tool_guard.js');
 
 console.log('\n\x1b[1m=== Test Suite 6: Antigravity Lifecycle Hooks & Perma-Logging Matrix ===\x1b[0m');
 
@@ -89,6 +90,7 @@ runTest('PreToolGuard: evaluates quota threshold without crashing and emits LOW_
     const lowWkRes = evaluateCommand('git status');
     assert.strictEqual(lowWkRes.safe, true);
     assert(lowWkRes.warning && lowWkRes.warning.includes('Weekly Quota Low (Wk: 12% remaining)'), `Expected Weekly Quota Low message, got: ${lowWkRes.warning}`);
+    assert(lowWkRes.warning.includes('Wk(A)') && lowWkRes.warning.includes('Wk(G)'), `Expected Wk(A) and Wk(G) guidance, got: ${lowWkRes.warning}`);
   } finally {
     if (prevEnv === undefined) delete process.env.HUD_TEST_QUOTA_FILE;
     else process.env.HUD_TEST_QUOTA_FILE = prevEnv;
@@ -116,6 +118,71 @@ runTest('SessionExit: on_session_exit.ps1 creates resume point and writes lifecy
   const homeDir = process.env.USERPROFILE || process.env.HOME || os.homedir();
   const jsonlLog = path.join(homeDir, '.gemini', 'logs', 'session_lifecycle.jsonl');
   assert(fs.existsSync(jsonlLog), 'session_lifecycle.jsonl must exist');
+});
+
+// 8. Pre-Tool Guard: Blocks claude3 CLI invocation
+runTest('PreToolGuard: blocks claude3 CLI invocation', () => {
+  const res1 = evaluateCommand('claude3');
+  assert.strictEqual(res1.safe, false, 'Must block bare claude3');
+  assert.strictEqual(res1.risk, 'CROSS_AGENT_CLI_BLOCKED');
+
+  const res2 = evaluateCommand('cd B:\\Repos; claude3 --version');
+  assert.strictEqual(res2.safe, false, 'Must block chained claude3 --version');
+  assert.strictEqual(res2.risk, 'CROSS_AGENT_CLI_BLOCKED');
+});
+
+// 9. Pre-Tool Guard: Blocks claude2 CLI invocation
+runTest('PreToolGuard: blocks claude2 CLI invocation', () => {
+  const res1 = evaluateCommand('claude2');
+  assert.strictEqual(res1.safe, false, 'Must block bare claude2');
+  assert.strictEqual(res1.risk, 'CROSS_AGENT_CLI_BLOCKED');
+
+  const res2 = evaluateCommand('cmd /c claude2 --version');
+  assert.strictEqual(res2.safe, false, 'Must block cmd /c claude2 --version');
+  assert.strictEqual(res2.risk, 'CROSS_AGENT_CLI_BLOCKED');
+});
+
+// 10. Pre-Tool Guard: Blocks claude.exe and full-path claude.exe invocations
+runTest('PreToolGuard: blocks claude.exe and full-path claude.exe invocations', () => {
+  const res1 = evaluateCommand('claude.exe');
+  assert.strictEqual(res1.safe, false, 'Must block bare claude.exe');
+  assert.strictEqual(res1.risk, 'CROSS_AGENT_CLI_BLOCKED');
+
+  const res2 = evaluateCommand('& "$HOME\\.local\\bin\\claude.exe"');
+  assert.strictEqual(res2.safe, false, 'Must block PowerShell call operator full-path claude.exe');
+  assert.strictEqual(res2.risk, 'CROSS_AGENT_CLI_BLOCKED');
+
+  const res3 = evaluateCommand('Start-Process claude.exe');
+  assert.strictEqual(res3.safe, false, 'Must block Start-Process claude.exe');
+  assert.strictEqual(res3.risk, 'CROSS_AGENT_CLI_BLOCKED');
+});
+
+// 11. Pre-Tool Guard: Blocks claude plugin list --json (direct and CLI exit 1)
+runTest('PreToolGuard: blocks claude plugin list --json (direct and CLI exit 1)', () => {
+  const res1 = evaluateCommand('claude plugin list --json');
+  assert.strictEqual(res1.safe, false, 'Must block claude plugin list --json');
+  assert.strictEqual(res1.risk, 'CROSS_AGENT_CLI_BLOCKED');
+
+  const cliRes = spawnSync('node', [preToolGuardPath, 'claude plugin list --json'], { encoding: 'utf8' });
+  assert.strictEqual(cliRes.status, 1, `Expected CLI exit 1 for claude plugin list --json, got ${cliRes.status}`);
+});
+
+// 12. Pre-Tool Guard: Allows read-only Get-Content ~/.claude/settings.json and non-executing .claude references
+runTest('PreToolGuard: allows read-only Get-Content ~/.claude/settings.json and non-executing .claude references', () => {
+  const safe1 = evaluateCommand('Get-Content ~/.claude/settings.json');
+  assert.strictEqual(safe1.safe, true, 'Must allow Get-Content ~/.claude/settings.json');
+
+  const safe2 = evaluateCommand('Get-Content C:\\Users\\ajjuk\\.claude\\settings.json');
+  assert.strictEqual(safe2.safe, true, 'Must allow Get-Content absolute .claude\\settings.json');
+
+  const safe3 = evaluateCommand('rg "claude" B:\\Repos\\antigravity-hud');
+  assert.strictEqual(safe3.safe, true, 'Must allow rg searching for claude literal');
+
+  const safe4 = evaluateCommand('git checkout -b feat/neon-orchestrator-wkg-and-claude-guard');
+  assert.strictEqual(safe4.safe, true, 'Must allow git branch containing -claude-');
+
+  const cliRes = spawnSync('node', [preToolGuardPath, 'Get-Content ~/.claude/settings.json'], { encoding: 'utf8' });
+  assert.strictEqual(cliRes.status, 0, `Expected CLI exit 0 for Get-Content ~/.claude/settings.json, got ${cliRes.status}`);
 });
 
 // Clean up sandbox

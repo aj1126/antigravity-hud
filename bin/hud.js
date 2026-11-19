@@ -1785,7 +1785,7 @@ if (args.length > 0) {
     console.log('  • \x1b[32mcontext\x1b[0m       Ctx: progress bar, % used & prompt cache rate');
     console.log('  • \x1b[32mfork\x1b[0m          🍴 Milestone & step fork advisory badge (snoozeable)');
     console.log('  • \x1b[32mquota_5h\x1b[0m      Quota: 5-hour reserve % & reset time');
-    console.log('  • \x1b[32mquota_weekly\x1b[0m  Wk(A)/Wk(F): weekly quota reserve % & reset date/time');
+    console.log('  • \x1b[32mquota_weekly\x1b[0m  Wk(A)/Wk(G): weekly quota reserve % & reset date/time');
     console.log('  • \x1b[32mcredits\x1b[0m       💳 Model AI Credits & Zero-Quota balance');
     console.log('  • \x1b[32mplan_tier\x1b[0m     ✨ Account Subscription Plan Tier');
     console.log('  • \x1b[32mmcp\x1b[0m           🔌 Active MCP server count');
@@ -2264,8 +2264,9 @@ function formatDuration(seconds, showSeconds = true, style = 'full') {
 
 function getQuotaSegments(payload, style5h = 'full', styleWk = 'full') {
   const modelStr = (typeof payload.model === 'string' ? payload.model : payload.model?.display_name || payload.model?.id || '').toLowerCase();
+  const modelIdStr = (payload.model && typeof payload.model === 'object' && payload.model.id ? String(payload.model.id) : '').toLowerCase();
   const is3p = modelStr.includes('claude') || modelStr.includes('gpt') || modelStr.includes('3p') || modelStr.includes('openai') || modelStr.includes('sonnet') || modelStr.includes('opus');
-  const isArgon = modelStr.includes('argon');
+  const isArgon = modelStr.includes('argon') || modelIdStr.includes('argon') || modelStr.includes('orchestrator-g1-pro') || modelIdStr.includes('orchestrator-g1-pro');
 
   const quotaMap = payload.quota || payload.quotas || payload.rate_limits || payload.limits || {};
 
@@ -2372,6 +2373,7 @@ function getQuotaSegments(payload, style5h = 'full', styleWk = 'full') {
           qFlashWkPercent: roundedFlashWk,
           qFlashWkReset,
           qFlashWkResetAt: qFlashWkReset ? now + qFlashWkReset * 1000 : null,
+          qGeminiWkPercent: roundedFlashWk,
           updatedAt: now
         }), 'utf8');
       }
@@ -2398,7 +2400,7 @@ function getQuotaSegments(payload, style5h = 'full', styleWk = 'full') {
           const remaining = Math.floor((resetAt - Date.now()) / 1000);
           qArgonWkReset = Math.max(0, remaining);
         }
-        if (qFlashWkPercent === null && cached.qFlashWkPercent !== undefined) qFlashWkPercent = cached.qFlashWkPercent;
+        if (qFlashWkPercent === null && (cached.qFlashWkPercent !== undefined || cached.qGeminiWkPercent !== undefined)) qFlashWkPercent = cached.qFlashWkPercent ?? cached.qGeminiWkPercent;
         if (qFlashWkReset === null && (cached.qFlashWkReset || cached.qFlashWkResetAt)) {
           const resetAt = cached.qFlashWkResetAt || (cached.updatedAt + cached.qFlashWkReset * 1000);
           const remaining = Math.floor((resetAt - Date.now()) / 1000);
@@ -2439,7 +2441,7 @@ function getQuotaSegments(payload, style5h = 'full', styleWk = 'full') {
 
     const activeWkReset = isArgon ? (qArgonWkReset || qFlashWkReset) : (qFlashWkReset || qArgonWkReset);
     const resetWkTime = (styleWk !== 'minimal' && activeWkReset && activeWkReset > 0) ? ` (↻ ${formatResetDateTime(activeWkReset, true, styleWk)})` : '';
-    quotaWkSegment = `Wk(A): ${colA}${valA}%\x1b[0m / Wk(F): ${colF}${valF}%\x1b[0m${resetWkTime}`;
+    quotaWkSegment = `Wk(A): ${colA}${valA}%\x1b[0m / Wk(G): ${colF}${valF}%\x1b[0m${resetWkTime}`;
   } else if (qWkPercent !== null) {
     const val = Math.round(qWkPercent);
     let col = '\x1b[32m';
@@ -2458,7 +2460,7 @@ function getQuotaSegments(payload, style5h = 'full', styleWk = 'full') {
     ? qArgonWkPercent
     : ((!is3p && !isArgon && qFlashWkPercent !== null) ? qFlashWkPercent : qWkPercent);
   const isZeroQuota = (q5hPercent !== null && Math.round(q5hPercent) === 0) || (activeWkPercent !== null && Math.round(activeWkPercent) === 0);
-  return { quota5hSegment, quotaWkSegment, isZeroQuota, q5hPercent, qWkPercent, qArgonWkPercent, qFlashWkPercent };
+  return { quota5hSegment, quotaWkSegment, isZeroQuota, q5hPercent, qWkPercent, qArgonWkPercent, qFlashWkPercent, qGeminiWkPercent: qFlashWkPercent };
 }
 
 function getCreditsSegment(payload, style = 'full', isZeroQuota = false) {
@@ -2753,10 +2755,18 @@ process.stdin.on('end', () => {
         if (parenMatch) rawEffort = parenMatch[1];
       }
       const baseModelName = modelName.replace(/\s*\((Low|Medium|High|XHigh|Max|Min)\)/gi, '').trim();
+      const modelIdLower = (payload.model && typeof payload.model === 'object' && payload.model.id)
+        ? String(payload.model.id).toLowerCase()
+        : '';
       const lowerMdl = baseModelName.toLowerCase();
+      const isOrchestrator = lowerMdl.includes('orchestrator') || modelIdLower.includes('orchestrator');
+      const isOrchNeon = isOrchestrator && (lowerMdl.includes('neon') || modelIdLower.includes('neon'));
+      const isOrchArgon = isOrchestrator && (lowerMdl.includes('argon') || modelIdLower.includes('argon') || lowerMdl.includes('g1-pro') || modelIdLower.includes('g1-pro'));
       let effort = '';
       if (stMdl === 'minimal') {
-        if (lowerMdl.includes('argon')) modelName = 'Argon';
+        if (isOrchestrator) modelName = isOrchNeon ? 'Orch(N)' : (isOrchArgon ? 'Orch(A)' : 'Orch');
+        else if (lowerMdl.includes('neon')) modelName = 'Neon';
+        else if (lowerMdl.includes('argon')) modelName = 'Argon';
         else if (lowerMdl.includes('hydrogen')) modelName = 'Hydrogen';
         else if (lowerMdl.includes('flash')) modelName = 'Flash';
         else if (lowerMdl.includes('sonnet')) modelName = 'Sonnet';
@@ -2764,17 +2774,24 @@ process.stdin.on('end', () => {
         else if (lowerMdl.includes('pro')) modelName = 'Pro';
         else modelName = baseModelName.split(' ')[0];
       } else if (stMdl === 'short') {
-        const shortFamily = lowerMdl.includes('argon') ? 'Argon' : (lowerMdl.includes('hydrogen') ? 'Hydrogen' : null);
-        if (shortFamily) {
-          modelName = shortFamily;
-          const shortEffMap = { XHIGH: 'XHI', HIGH: 'HI', MEDIUM: 'MED', LOW: 'LOW', MAX: 'MAX', MIN: 'MIN' };
-          const shortEff = rawEffort ? (shortEffMap[rawEffort.toUpperCase()] || rawEffort.toUpperCase()) : '';
+        const shortEffMap = { XHIGH: 'XHI', HIGH: 'HI', MEDIUM: 'MED', LOW: 'LOW', MAX: 'MAX', MIN: 'MIN' };
+        const shortEff = rawEffort ? (shortEffMap[rawEffort.toUpperCase()] || rawEffort.toUpperCase()) : '';
+        if (isOrchestrator) {
+          modelName = isOrchNeon ? 'Orch(N)' : (isOrchArgon ? 'Orch(A)' : 'Orch');
           if (shortEff) effort = ` \x1b[90m[${shortEff}]\x1b[0m`;
         } else {
-          modelName = baseModelName.replace(/\(.*?\)/g, '').trim();
+          const shortFamily = lowerMdl.includes('neon') ? 'Neon' : (lowerMdl.includes('argon') ? 'Argon' : (lowerMdl.includes('hydrogen') ? 'Hydrogen' : null));
+          if (shortFamily) {
+            modelName = shortFamily;
+            if (shortEff) effort = ` \x1b[90m[${shortEff}]\x1b[0m`;
+          } else {
+            modelName = baseModelName.replace(/\(.*?\)/g, '').trim();
+          }
         }
       } else {
-        modelName = baseModelName;
+        if (isOrchNeon && !lowerMdl.includes('orchestrator (')) modelName = 'Orchestrator (Neon)';
+        else if (isOrchArgon && !lowerMdl.includes('orchestrator (')) modelName = 'Orchestrator (Argon)';
+        else modelName = baseModelName;
         if (rawEffort) {
           effort = ` \x1b[90m[🧠 ${rawEffort.toUpperCase()}]\x1b[0m`;
         }

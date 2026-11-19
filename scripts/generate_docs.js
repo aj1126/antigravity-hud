@@ -277,12 +277,12 @@ const TELEMETRY_ITEMS = [
     key: 'model',
     category: 'Identity & Source Control',
     name: 'Model & Reasoning Effort',
-    description: 'Active AI model display name and reasoning effort level (`[🧠 HIGH]`, `[🧠 MED]`, `[🧠 LOW]`).',
+    description: 'Active AI model display name and reasoning effort level (`[🧠 XHIGH]`, `[🧠 HIGH]`, `[🧠 MED]`, `[🧠 LOW]`).',
     payloadPath: 'payload.model.display_name, payload.model.effort',
-    fullSample: 'Gemini 4 Argon [🧠 HIGH]',
-    shortSample: 'Argon [HI]',
-    minimalSample: 'Argon',
-    stylingNotes: 'Full strips duplicate parenthesized effort tags; Short uses compact `[HI]`/`[MED]`/`[LOW]`; Minimal simplifies to `Argon`, `Flash`, `Sonnet`, `Opus`, `Pro`.'
+    fullSample: 'Gemini 4 Neon [🧠 HIGH]',
+    shortSample: 'Neon [HI]',
+    minimalSample: 'Neon',
+    stylingNotes: 'Full strips duplicate parenthesized effort tags; Short uses compact `Neon [HI]`/`Argon [HI]`/`Hydrogen [HI]` and `Orch(N)`/`Orch(A)`; Minimal simplifies to `Neon`, `Orch(N)`, `Orch(A)`, `Argon`, `Hydrogen`, `Flash`, `Sonnet`, `Opus`, `Pro`.'
   },
   {
     key: 'state',
@@ -323,10 +323,10 @@ const TELEMETRY_ITEMS = [
     name: 'Weekly Quota Reserve',
     description: 'Weekly quota reserve percentage across Gemini (`gemini-argon-wtu-weekly` + `gemini-weekly` side-by-side) or 3P providers.',
     payloadPath: 'payload.quota["gemini-argon-wtu-weekly"], payload.quota["gemini-weekly"], payload.quota["3p-weekly"]',
-    fullSample: 'Wk(A): 64% / Wk(F): 100%',
-    shortSample: 'Wk(A): 64% / Wk(F): 100%',
-    minimalSample: 'Wk(A): 64% / Wk(F): 100%',
-    stylingNotes: 'Renders both Argon WTU (`Wk(A)`) and Flash (`Wk(F)`) weekly pools side-by-side when both exist, with single-bucket `Wk:` fallback.'
+    fullSample: 'Wk(A): 64% / Wk(G): 100%',
+    shortSample: 'Wk(A): 64% / Wk(G): 100%',
+    minimalSample: 'Wk(A): 64% / Wk(G): 100%',
+    stylingNotes: 'Renders both Argon WTU (`Wk(A)`) and shared Gemini (`Wk(G)`: Neon, Hydrogen, 3.8 Flash) weekly pools side-by-side when both exist, with single-bucket `Wk:` fallback.'
   },
   {
     key: 'session',
@@ -472,9 +472,9 @@ const LIFECYCLE_HOOKS = [
     name: 'pre_tool_guard.js',
     path: 'hooks/pre_tool_guard.js',
     trigger: 'Executed prior to subshell tool execution',
-    purpose: 'Zero-quota local AST and regex guardrail that blocks destructive shell commands (`git reset --hard`, `git push --force`, `rm -rf`) and warns on quota exhaustion (< 15%).',
+    purpose: 'Zero-quota local AST and regex guardrail that blocks destructive shell commands (`git reset --hard`, `git push --force`, `rm -rf`) and cross-agent `claude*` CLI invocations (`claude`, `claude2`, `claude3`, `claude.exe`, `Start-Process ... claude`) while allowing read-only `.claude` path inspection, and warns on 5h/weekly (`Wk(A)`/`Wk(G)`) quota exhaustion (< 15%).',
     args: '<command-string>',
-    exitCodes: '0 (Safe), 1 (Blocked destructive command)'
+    exitCodes: '0 (Safe), 1 (Blocked destructive or cross-agent CLI command)'
   },
   {
     name: 'post_tool_format.js',
@@ -703,9 +703,9 @@ ${LIFECYCLE_HOOKS.map(h => `| **\`${h.name}\`** | ${h.trigger} | ${h.purpose} | 
 ### 3. \`hooks/pre_tool_guard.js\`
 * **Execution Trigger:** Pre-tool invocation.
 * **Operations:**
-  - Blocks high-risk destructive commands (\`git reset --hard\`, \`git push --force\`, \`rm -rf\`, \`drop database\`).
-  - Evaluates remaining 5-hour rolling quota from \`~/.gemini/tmp/last_quota.json\`.
-  - Emits advisory warning when quota drops below 15% (\`Quota Low: Suggest /effort low\`).
+  - Blocks high-risk destructive commands (\`git reset --hard\`, \`git push --force\`, \`rm -rf\`, \`drop database\`) and cross-agent \`claude*\` CLI invocations (\`claude\`, \`claude2\`, \`claude3\`, \`claude.exe\`, \`Start-Process ... claude\`) while allowing non-executing \`.claude\` file reads.
+  - Evaluates remaining 5-hour rolling and weekly (\`Wk(A)\` / \`Wk(G)\`) quotas from \`~/.gemini/tmp/last_quota.json\`.
+  - Emits advisory warning when 5h or weekly quota drops below 15% (\`Quota Low\` / \`Weekly Quota Low\`).
 
 ### 4. \`hooks/post_tool_format.js\`
 * **Execution Trigger:** Post-tool file write or modification.
@@ -810,11 +810,12 @@ function generateReadmeItemsTable() {
 
 function updateReadmeContent(currentReadme) {
   let updated = currentReadme;
+  const eol = currentReadme.includes('\r\n') ? '\r\n' : '\n';
 
   // Sync CLI Table
   const cliStart = '<!-- AUTO-DOC:CLI_TABLE:START -->';
   const cliEnd = '<!-- AUTO-DOC:CLI_TABLE:END -->';
-  const cliTable = `\n${generateReadmeCliTable()}\n`;
+  const cliTable = `\n${generateReadmeCliTable()}\n`.replace(/\r?\n/g, eol);
 
   if (updated.includes(cliStart) && updated.includes(cliEnd)) {
     const regex = new RegExp(`${cliStart}[\\s\\S]*?${cliEnd}`);
@@ -824,7 +825,7 @@ function updateReadmeContent(currentReadme) {
   // Sync Items Table
   const itemsStart = '<!-- AUTO-DOC:ITEMS_TABLE:START -->';
   const itemsEnd = '<!-- AUTO-DOC:ITEMS_TABLE:END -->';
-  const itemsTable = `\n${generateReadmeItemsTable()}\n`;
+  const itemsTable = `\n${generateReadmeItemsTable()}\n`.replace(/\r?\n/g, eol);
 
   if (updated.includes(itemsStart) && updated.includes(itemsEnd)) {
     const regex = new RegExp(`${itemsStart}[\\s\\S]*?${itemsEnd}`);
@@ -859,7 +860,7 @@ function main() {
   if (fs.existsSync(readmePath)) {
     currentReadme = fs.readFileSync(readmePath, 'utf8');
     updatedReadme = updateReadmeContent(currentReadme);
-    if (currentReadme !== updatedReadme) {
+    if (currentReadme.replace(/\r\n/g, '\n') !== updatedReadme.replace(/\r\n/g, '\n')) {
       readmeDrift = true;
     }
   }
@@ -906,7 +907,7 @@ function main() {
     console.log(`  \x1b[32m✔\x1b[0m Generated: ${relName}`);
   }
 
-  if (updatedReadme && currentReadme !== updatedReadme) {
+  if (updatedReadme && readmeDrift) {
     fs.writeFileSync(readmePath, updatedReadme, 'utf8');
     console.log(`  \x1b[32m✔\x1b[0m Synchronized tables in README.md`);
   } else if (updatedReadme) {

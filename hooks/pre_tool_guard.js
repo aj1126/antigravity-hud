@@ -21,6 +21,13 @@ const HIGH_RISK_PATTERNS = [
   /\bdrop\s+database\b/i
 ];
 
+// Cross-agent CLI dispatch guard (mutual manual-only policy)
+const CROSS_AGENT_CLI_PATTERNS = [
+  /(?:^|[;&|(\r\n])\s*(?:(?:&\s*|\.\s*)?(?:"(?:[^"\r\n]*[\\/])?|'(?:[^'\r\n]*[\\/])?|(?:[^\s'"&|;()]*[\\/])?))claude(?:[23])?(?:\.(?:exe|cmd|bat|ps1))?['"]?(?=$|[\s;&|)\r\n])/i,
+  /\bStart-Process\b[^\r\n;|&]*?(?:['"\s\\/]|^)claude(?:[23])?(?:\.(?:exe|cmd|bat|ps1))?(?=$|[\s'"&|;\r\n])/i,
+  /\b(?:cmd(?:\.exe)?\s+\/[ck]|(?:pwsh|powershell)(?:\.exe)?\s+[^\r\n;|&]*?-(?:c|Command)|(?:Invoke-Expression|iex))\s+['"]?\s*(?:&\s*|\.\s*)?(?:"(?:[^"\r\n]*[\\/])?|'(?:[^'\r\n]*[\\/])?|(?:[^\s'"&|;()]*[\\/])?)claude(?:[23])?(?:\.(?:exe|cmd|bat|ps1))?['"]?(?=$|[\s'"&|;\r\n])/i
+];
+
 function evaluateCommand(cmd) {
   if (!cmd || typeof cmd !== 'string') {
     return { safe: true, warning: null };
@@ -38,6 +45,18 @@ function evaluateCommand(cmd) {
     }
   }
 
+  // 1b. Block cross-agent Claude CLI invocations (mutual manual-only dispatch policy)
+  for (const pattern of CROSS_AGENT_CLI_PATTERNS) {
+    if (pattern.test(cmd)) {
+      return {
+        safe: false,
+        risk: 'CROSS_AGENT_CLI_BLOCKED',
+        matched: pattern.toString(),
+        message: `Blocked cross-agent Claude CLI invocation (manual-only policy): "${cmd}"`
+      };
+    }
+  }
+
   // 2. Check Quota Thresholds (5h rolling and active weekly WTU / standard pool)
   const quotaFile = process.env.HUD_TEST_QUOTA_FILE || path.join(homeDir, '.gemini', 'tmp', 'last_quota.json');
   let quotaWarning = null;
@@ -45,11 +64,11 @@ function evaluateCommand(cmd) {
     try {
       const quota = JSON.parse(fs.readFileSync(quotaFile, 'utf8'));
       const percent5h = quota.q5hPercent ?? quota.percent_remaining ?? quota.remaining_percentage;
-      const percentWk = quota.qWkPercent ?? quota.qArgonWkPercent ?? quota.qFlashWkPercent;
+      const percentWk = quota.qWkPercent ?? quota.qArgonWkPercent ?? quota.qGeminiWkPercent ?? quota.qFlashWkPercent;
       if (typeof percent5h === 'number' && percent5h < 15) {
         quotaWarning = `Quota Low (5h: ${percent5h}% remaining). Suggest reasoning effort adjustment (/effort low).`;
       } else if (typeof percentWk === 'number' && percentWk < 15) {
-        quotaWarning = `Weekly Quota Low (Wk: ${percentWk}% remaining). Suggest reasoning effort adjustment (/effort low) or model switch.`;
+        quotaWarning = `Weekly Quota Low (Wk: ${percentWk}% remaining). Suggest reasoning effort adjustment (/effort low) or switching between Wk(A) and Wk(G) models.`;
       }
     } catch (_) {}
   }
@@ -71,4 +90,4 @@ if (require.main === module) {
   process.exit(0);
 }
 
-module.exports = { evaluateCommand, HIGH_RISK_PATTERNS };
+module.exports = { evaluateCommand, HIGH_RISK_PATTERNS, CROSS_AGENT_CLI_PATTERNS };
