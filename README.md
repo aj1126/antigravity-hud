@@ -94,7 +94,7 @@ Antigravity HUD includes 4 local, zero-token lifecycle hooks deployed in `~/.gem
 
 1. **`post_tool_format.js`**: Automatically formats edited files via local Prettier / ast-grep and strips harmful UTF-8 BOM preambles with 0 LLM token cost.
 2. **`on_session_start.ps1`**: Silent pre-flight sanity check and `.workspace_context/resume-points/` auto-discovery.
-3. **`pre_tool_guard.js`**: Intercepts destructive git commands (`git reset --hard`, `git push --force`, `rm -rf`) and monitors rolling quota exhaustion (< 15%).
+3. **`pre_tool_guard.js`**: Intercepts destructive git commands (`git reset --hard`, `git push --force`, `rm -rf`), cross-agent `claude*` CLI invocations (including `npx @anthropic-ai/claude-code` and `node .../@anthropic-ai/claude-code/cli.js`), and unratified writes to protected `~/.gemini` paths (`evaluateTargetPath`) across CLI argv and PreToolUse stdin JSON payloads (`{"decision":"allow"|"deny"}`), while allowing read-only `.claude` inspection and monitoring 5h/weekly (`Wk(A)`/`Wk(G)`) quota exhaustion (< 15%).
 4. **`on_session_exit.ps1`**: Detached background quad-sync worker that creates session resume points, quad-syncs devlogs, triggers git commits, and delivers native Windows 11 Toast notifications after console closure.
 
 ---
@@ -151,11 +151,11 @@ For detailed guides, architectural specifications, and full schemas:
 | :--- | :--- | :--- | :--- |
 | **`workspace`** | Workspace & Git Branch — Active workspace folder, Antigravity project name alias, and Git branch with ahead/behind indicators (`↑1 ↓2`) | `📁 MyProject › Core (⎇ main * ↑1)` | `📁 Core` |
 | **`git_status`** | Git Clean / Dirty Status — Working directory state indicating whether uncommitted changes exist (`+staged`, `~unstaged`, `?untracked`) | `🌿 Clean / ⚠️ Dirty (+1 ~2)` | `🌿 / ⚠️` |
-| **`model`** | Model & Reasoning Effort — Active AI model display name and reasoning effort level (`[🧠 HIGH]`, `[🧠 MED]`, `[🧠 LOW]`) | `Gemini 4 Argon [🧠 HIGH]` | `Argon` |
+| **`model`** | Model & Reasoning Effort — Active AI model display name and reasoning effort level (`[🧠 XHIGH]`, `[🧠 HIGH]`, `[🧠 MED]`, `[🧠 LOW]`) | `Gemini 4 Neon [🧠 HIGH]` | `Neon` |
 | **`state`** | Agent Lifecycle State — Current agent execution state (`[WORKING]`, `[IDLE]`, `[WAITING]`, `[ERROR]`) | `[WORKING]` | `● (colored)` |
 | **`context`** | Context Window & Prompt Cache — Real-time context window token utilization percentage, token count summary, visual block bar, and prompt cache hit rate | `Ctx: ██░░░░░░░░ 22% (229k tok) (⚡ 93% Cache)` | `Ctx: 22%` |
 | **`quota_5h`** | 5-Hour Rolling Quota Reserve — Active 5-hour rolling token reserve percentage and countdown reset timer (`↻ 3h 14m`) | `Quota: 53% (↻ 3h 34m)` | `5h: 53%` |
-| **`quota_weekly`** | Weekly Quota Reserve — Weekly quota reserve percentage across Gemini (`gemini-argon-wtu-weekly` + `gemini-weekly` side-by-side) or 3P providers | `Wk(A): 64% / Wk(F): 100%` | `Wk(A): 64% / Wk(F): 100%` |
+| **`quota_weekly`** | Weekly Quota Reserve — Weekly quota reserve percentage across Gemini (`gemini-argon-wtu-weekly` + `gemini-weekly` side-by-side) or 3P providers | `Wk(A): 64% / Wk(G): 100%` | `Wk(A): 64% / Wk(G): 100%` |
 | **`session`** | Session Elapsed Uptime — Color-graded elapsed time since session start with optional seconds display and configurable threshold bands | `⏱️ 1h 24m 15s` | `⏱️ 84m` |
 | **`session_name`** | Session Name (Title) — Active Antigravity session title (`conversation_title`) rendered independently of the workspace directory badge | `🏷️ MasterControlCenter_SitStu_Nov2026` | `MasterControl…` |
 | **`session_id`** | Session UUID — Active session or conversation identifier rendered as a dedicated footer item | `🆔 c4389f31-ea6b-4188-92ac-49962cf376ef` | `c4389f31` |

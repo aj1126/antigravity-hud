@@ -10,7 +10,7 @@ The Antigravity HUD System includes a local, zero-cloud-token lifecycle hooks su
 | :--- | :--- | :--- | :--- |
 | **`on_session_start.ps1`** | Executed on Antigravity session initialization | Performs pre-flight health validation, checks git status, and locates cognitive resume points (`.workspace_context/resume-points/`). | `0 (Success / Non-blocking)` |
 | **`on_session_exit.ps1`** | Executed on Antigravity session exit or console closure | Spawns a detached background worker to generate session resume points, quad-syncs developer logs, auto-commits git changes, delivers Windows 11 Toast notifications, and writes permanent JSONL logs. | `0 (Success / Detached)` |
-| **`pre_tool_guard.js`** | Executed prior to subshell tool execution | Zero-quota local AST and regex guardrail that blocks destructive shell commands (`git reset --hard`, `git push --force`, `rm -rf`) and warns on quota exhaustion (< 15%). | `0 (Safe), 1 (Blocked destructive command)` |
+| **`pre_tool_guard.js`** | Executed prior to subshell tool execution | Zero-quota local AST and regex guardrail that blocks destructive shell commands (`git reset --hard`, `git push --force`, `rm -rf`), cross-agent `claude*` CLI invocations (`claude`, `claude2`, `claude3`, `claude.exe`, `Start-Process ... claude`, `npx @anthropic-ai/claude-code`, `node .../@anthropic-ai/claude-code/cli.js`), and unratified writes to protected `~/.gemini` paths (`evaluateTargetPath`) across both CLI argv and stdin JSON hook payloads (`{ decision: "allow" | "deny" }`), while allowing read-only `.claude` path inspection and warning on 5h/weekly (`Wk(A)`/`Wk(G)`) quota exhaustion (< 15%). | `0 (Safe or JSON decision emitted), 1 (Blocked via CLI argv)` |
 | **`post_tool_format.js`** | Executed after file creation or modification tools | Automatically strips harmful UTF-8 BOM preambles and applies local Prettier formatting with zero LLM token cost. | `0 (Success), 1 (Format failure)` |
 
 ---
@@ -38,9 +38,11 @@ The Antigravity HUD System includes a local, zero-cloud-token lifecycle hooks su
 ### 3. `hooks/pre_tool_guard.js`
 * **Execution Trigger:** Pre-tool invocation.
 * **Operations:**
-  - Blocks high-risk destructive commands (`git reset --hard`, `git push --force`, `rm -rf`, `drop database`).
-  - Evaluates remaining 5-hour rolling quota from `~/.gemini/tmp/last_quota.json`.
-  - Emits advisory warning when quota drops below 15% (`Quota Low: Suggest /effort low`).
+  - Supports both direct CLI argument checks (exit `0`/`1`) and PreToolUse stdin JSON hook payloads (`{ "decision": "allow" | "deny" }`).
+  - Blocks high-risk destructive commands (`git reset --hard`, `git push --force`, `rm -rf`, `drop database`) and cross-agent `claude*` CLI invocations (`claude`, `claude2`, `claude3`, `claude.exe`, `Start-Process ... claude`, `npx @anthropic-ai/claude-code`, `node .../@anthropic-ai/claude-code/cli.js`) while allowing non-executing `.claude` file reads.
+  - Protects live Antigravity rules, `mcp_config.json`, and `GEMINI.md` via `evaluateTargetPath` (bypassed only when `AGY_RATIFY_ACTIVE=1`).
+  - Evaluates remaining 5-hour rolling and weekly (`Wk(A)` / `Wk(G)`) quotas from `~/.gemini/tmp/last_quota.json`.
+  - Emits advisory warning when 5h or weekly quota drops below 15% (`Quota Low` / `Weekly Quota Low`).
 
 ### 4. `hooks/post_tool_format.js`
 * **Execution Trigger:** Post-tool file write or modification.

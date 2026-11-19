@@ -273,8 +273,8 @@ runTest('Engine: zero-quota conditions apply alert highlight to credits segment'
   assert(clean.includes('💳 1,850 Credits [0Q Active]'), 'Expected formatted zero-quota alert string');
 });
 
-// 15. Gemini 4 Argon Model Badges, Dual Weekly Quota Wk(A)/Wk(F), Cache Isolation & Active-Model 0Q
-runTest('Engine: Gemini 4 Argon renders full/short/minimal badges, dual Wk(A)/Wk(F) quota, and active-model 0Q', () => {
+// 15. Gemini 4 Argon Model Badges, Dual Weekly Quota Wk(A)/Wk(G), Cache Isolation & Active-Model 0Q
+runTest('Engine: Gemini 4 Argon renders full/short/minimal badges, dual Wk(A)/Wk(G) quota, and active-model 0Q', () => {
   const payloadStr = fs.readFileSync(fixturePayloadPath, 'utf8');
   const payload = JSON.parse(payloadStr);
   payload.model = {
@@ -304,7 +304,7 @@ runTest('Engine: Gemini 4 Argon renders full/short/minimal badges, dual Wk(A)/Wk
   assert.strictEqual(res.status, 0);
   let clean = stripAnsi(res.stdout);
   assert(clean.includes('Gemini 4 Argon [🧠 HIGH]'), `Expected full Argon badge, got: ${clean}`);
-  assert(clean.includes('Wk(A): 64% / Wk(F): 100%'), `Expected dual Wk(A)/Wk(F) segment, got: ${clean}`);
+  assert(clean.includes('Wk(A): 64% / Wk(G): 100%'), `Expected dual Wk(A)/Wk(G) segment, got: ${clean}`);
   assert(!clean.includes('[0Q Active]'), 'Should not trigger 0Q when Argon weekly is 64%');
 
   // Verify HUD_TEST_QUOTA_FILE persisted dual weekly fields
@@ -381,7 +381,7 @@ runTest('Engine: Gemini 4 Hydrogen binds to gemini-weekly (not Argon WTU) and re
   assert.strictEqual(res.status, 0);
   let clean = stripAnsi(res.stdout);
   assert(clean.includes('Gemini 4 Hydrogen [🧠 XHIGH]'), `Expected full Hydrogen badge, got: ${clean}`);
-  assert(clean.includes('Wk(A): 100% / Wk(F): 87%'), `Expected dual Wk(A)/Wk(F) segment, got: ${clean}`);
+  assert(clean.includes('Wk(A): 100% / Wk(G): 87%'), `Expected dual Wk(A)/Wk(G) segment, got: ${clean}`);
   assert(!clean.includes('[0Q Active]'), 'Should not trigger 0Q when Hydrogen/Flash weekly is 87%');
 
   const cachedQuota = JSON.parse(fs.readFileSync(testQuotaCache, 'utf8'));
@@ -452,7 +452,10 @@ runTest('Baseline: hud title overrides workspace 📁 badge in isolated HOME wit
   };
 
   // Without custom title, conversation_title must NOT override the 📁 workspace label
+  const mockWsDir = path.join(isolatedHome, 'antigravity-hud');
+  fs.mkdirSync(mockWsDir, { recursive: true });
   const payload = JSON.parse(fs.readFileSync(fixturePayloadPath, 'utf8'));
+  payload.cwd = mockWsDir;
   payload.conversation_title = 'Session_Only_Name';
   let res = spawnSync('node', [hudScriptPath], { input: JSON.stringify(payload), env: isoEnv, encoding: 'utf8' });
   assert.strictEqual(res.status, 0);
@@ -461,7 +464,7 @@ runTest('Baseline: hud title overrides workspace 📁 badge in isolated HOME wit
   assert(!clean.includes('📁 Session_Only_Name'), 'conversation_title must not hijack workspace 📁 badge');
 
   // With hud title, workspace_titles.json overrides 📁 badge and emits OSC 0
-  res = spawnSync('node', [hudScriptPath, 'title', 'Pinned Workspace Name'], { env: isoEnv, encoding: 'utf8', cwd: path.resolve(__dirname, '..') });
+  res = spawnSync('node', [hudScriptPath, 'title', 'Pinned Workspace Name'], { env: isoEnv, encoding: 'utf8', cwd: mockWsDir });
   assert.strictEqual(res.status, 0);
   const titlesPath = path.join(isolatedHome, '.gemini', 'tmp', 'workspace_titles.json');
   assert(fs.existsSync(titlesPath), 'workspace_titles.json must be created in isolated HOME');
@@ -473,7 +476,7 @@ runTest('Baseline: hud title overrides workspace 📁 badge in isolated HOME wit
   assert(res.stdout.includes('\x1b]0;\u{1FA90} agy - Pinned Workspace Name\x07'), 'Expected OSC 0 tab title');
 
   // Reset restores directory name
-  res = spawnSync('node', [hudScriptPath, 'title', 'reset'], { env: isoEnv, encoding: 'utf8', cwd: path.resolve(__dirname, '..') });
+  res = spawnSync('node', [hudScriptPath, 'title', 'reset'], { env: isoEnv, encoding: 'utf8', cwd: mockWsDir });
   assert.strictEqual(res.status, 0);
   res = spawnSync('node', [hudScriptPath], { input: JSON.stringify(payload), env: isoEnv, encoding: 'utf8' });
   clean = stripAnsi(res.stdout);
@@ -605,6 +608,272 @@ runTest('TDD: session_id renders full UUID in full mode, 8-char prefix in short/
   res = spawnSync('node', [hudScriptPath], { input: JSON.stringify(payload), env, encoding: 'utf8' });
   clean = stripAnsi(res.stdout);
   assert(!clean.includes('🆔'), `Missing session_id must not render 🆔 badge, got: ${clean}`);
+});
+
+// 22. Gemini 4 Neon (XHigh) Badges, Wk(A)/Wk(G) Quota & Active-Model 0Q
+runTest('Engine: Gemini 4 Neon (XHigh) renders full/short/minimal badges, Wk(A)/Wk(G) quota, and active-model 0Q', () => {
+  const payloadStr = fs.readFileSync(fixturePayloadPath, 'utf8');
+  const payload = JSON.parse(payloadStr);
+  payload.model = {
+    id: 'gemini-4-neon-xhigh',
+    display_name: 'Gemini 4 Neon (XHigh)',
+    effort: 'xhigh'
+  };
+  payload.rate_limits = {
+    'gemini-5h': { remaining_percentage: 96, reset_in_seconds: 18000 },
+    'gemini-argon-wtu-weekly': { remaining_percentage: 100, reset_in_seconds: 604800 },
+    'gemini-weekly': { remaining_percentage: 98, reset_in_seconds: 114390 }
+  };
+  delete payload.quota;
+  payload.credits = 2000;
+
+  const testQuotaCache = path.join(tempTestDir, 'test_neon_last_quota.json');
+  const envWithQuotaFile = Object.assign({}, env, { HUD_TEST_QUOTA_FILE: testQuotaCache });
+
+  // 22a. Full mode -> Gemini 4 Neon [🧠 XHIGH], deduplicates (XHigh), Wk(A)/Wk(G)
+  const fullCfg = JSON.parse(fs.readFileSync(fixtureCfgPath, 'utf8'));
+  fullCfg.item_styles = Object.assign({}, fullCfg.item_styles, { model: 'full' });
+  fs.writeFileSync(testConfigPath, JSON.stringify(fullCfg, null, 2), 'utf8');
+  let res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  assert.strictEqual(res.status, 0);
+  let clean = stripAnsi(res.stdout);
+  assert(clean.includes('Gemini 4 Neon [🧠 XHIGH]'), `Expected full Neon badge, got: ${clean}`);
+  assert(!clean.includes('(XHigh)'), `Expected trailing (XHigh) deduplicated, got: ${clean}`);
+  assert(clean.includes('Wk(A): 100% / Wk(G): 98%'), `Expected dual Wk(A)/Wk(G) segment, got: ${clean}`);
+  assert(!clean.includes('[0Q Active]'), 'Should not trigger 0Q when gemini-weekly is 98%');
+
+  const cachedQuota = JSON.parse(fs.readFileSync(testQuotaCache, 'utf8'));
+  assert.strictEqual(cachedQuota.qWkPercent, 98);
+  assert.strictEqual(cachedQuota.qArgonWkPercent, 100);
+  assert.strictEqual(cachedQuota.qFlashWkPercent, 98);
+
+  // 22b. Short mode -> Neon [XHI] / [HI] / [MED] / [LOW]
+  const shortCfg = JSON.parse(fs.readFileSync(fixtureCfgPath, 'utf8'));
+  shortCfg.item_styles = Object.assign({}, shortCfg.item_styles, { model: 'short' });
+  fs.writeFileSync(testConfigPath, JSON.stringify(shortCfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('Neon [XHI]'), `Expected short Neon [XHI] badge, got: ${clean}`);
+
+  for (const [label, eff, tag] of [['High', 'high', 'HI'], ['Medium', 'medium', 'MED'], ['Low', 'low', 'LOW']]) {
+    const tierPayload = Object.assign({}, payload, {
+      model: { id: `gemini-4-neon-${eff}`, display_name: `Gemini 4 Neon (${label})`, effort: eff }
+    });
+    res = spawnSync('node', [hudScriptPath], {
+      input: JSON.stringify(tierPayload),
+      env: envWithQuotaFile,
+      encoding: 'utf8'
+    });
+    clean = stripAnsi(res.stdout);
+    assert(clean.includes(`Neon [${tag}]`), `Expected short Neon [${tag}] badge, got: ${clean}`);
+  }
+
+  // 22c. Minimal mode -> Neon │ (never Gemini │)
+  const minCfg = JSON.parse(fs.readFileSync(fixtureCfgPath, 'utf8'));
+  minCfg.item_styles = Object.assign({}, minCfg.item_styles, { model: 'minimal' });
+  fs.writeFileSync(testConfigPath, JSON.stringify(minCfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('Neon │'), `Expected minimal Neon badge, got: ${clean}`);
+  assert(!clean.includes('Gemini │'), `Minimal Neon must not collapse to Gemini, got: ${clean}`);
+
+  // 22d. Active-model 0Q binds to gemini-weekly, not gemini-argon-wtu-weekly
+  fs.copyFileSync(fixtureCfgPath, testConfigPath);
+  payload.rate_limits['gemini-argon-wtu-weekly'].remaining_percentage = 0;
+  payload.rate_limits['gemini-weekly'].remaining_percentage = 98;
+  res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  clean = stripAnsi(res.stdout);
+  assert(!clean.includes('[0Q Active]'), 'Should NOT trigger [0Q Active] for Neon when only Argon WTU is 0%');
+
+  payload.rate_limits['gemini-argon-wtu-weekly'].remaining_percentage = 100;
+  payload.rate_limits['gemini-weekly'].remaining_percentage = 0;
+  res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('[0Q Active]'), 'Expected [0Q Active] for Neon when gemini-weekly is 0%');
+});
+
+// 23. Orchestrator (Neon) Badges & gemini-weekly Quota Binding
+runTest('Engine: Orchestrator (Neon) renders Orchestrator (Neon) / Orch(N) badges and binds to gemini-weekly', () => {
+  const payloadStr = fs.readFileSync(fixturePayloadPath, 'utf8');
+  const payload = JSON.parse(payloadStr);
+  payload.model = {
+    id: 'gemini-pro-orchestrator-neon',
+    display_name: 'Orchestrator (Neon)'
+  };
+  payload.rate_limits = {
+    'gemini-5h': { remaining_percentage: 95, reset_in_seconds: 18000 },
+    'gemini-argon-wtu-weekly': { remaining_percentage: 100, reset_in_seconds: 604800 },
+    'gemini-weekly': { remaining_percentage: 82, reset_in_seconds: 114390 }
+  };
+  delete payload.quota;
+  payload.credits = 2000;
+
+  const testQuotaCache = path.join(tempTestDir, 'test_orch_neon_last_quota.json');
+  const envWithQuotaFile = Object.assign({}, env, { HUD_TEST_QUOTA_FILE: testQuotaCache });
+
+  // 23a. Full mode
+  const fullCfg = JSON.parse(fs.readFileSync(fixtureCfgPath, 'utf8'));
+  fullCfg.item_styles = Object.assign({}, fullCfg.item_styles, { model: 'full' });
+  fs.writeFileSync(testConfigPath, JSON.stringify(fullCfg, null, 2), 'utf8');
+  let res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  assert.strictEqual(res.status, 0);
+  let clean = stripAnsi(res.stdout);
+  assert(clean.includes('Orchestrator (Neon)'), `Expected full Orchestrator (Neon) badge, got: ${clean}`);
+  assert(clean.includes('Wk(A): 100% / Wk(G): 82%'), `Expected dual Wk(A)/Wk(G) segment, got: ${clean}`);
+  const cachedQuota = JSON.parse(fs.readFileSync(testQuotaCache, 'utf8'));
+  assert.strictEqual(cachedQuota.qWkPercent, 82);
+
+  // 23b. Short mode -> Orch(N) │
+  const shortCfg = JSON.parse(fs.readFileSync(fixtureCfgPath, 'utf8'));
+  shortCfg.item_styles = Object.assign({}, shortCfg.item_styles, { model: 'short' });
+  fs.writeFileSync(testConfigPath, JSON.stringify(shortCfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('Orch(N) │'), `Expected short Orch(N) badge, got: ${clean}`);
+
+  // 23c. Minimal mode -> Orch(N) │
+  const minCfg = JSON.parse(fs.readFileSync(fixtureCfgPath, 'utf8'));
+  minCfg.item_styles = Object.assign({}, minCfg.item_styles, { model: 'minimal' });
+  fs.writeFileSync(testConfigPath, JSON.stringify(minCfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('Orch(N) │'), `Expected minimal Orch(N) badge, got: ${clean}`);
+
+  // 23d. Active-model 0Q binds to gemini-weekly
+  fs.copyFileSync(fixtureCfgPath, testConfigPath);
+  payload.rate_limits['gemini-argon-wtu-weekly'].remaining_percentage = 0;
+  payload.rate_limits['gemini-weekly'].remaining_percentage = 82;
+  res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  clean = stripAnsi(res.stdout);
+  assert(!clean.includes('[0Q Active]'), 'Should NOT trigger [0Q Active] for Orchestrator (Neon) when only Argon WTU is 0%');
+
+  payload.rate_limits['gemini-argon-wtu-weekly'].remaining_percentage = 100;
+  payload.rate_limits['gemini-weekly'].remaining_percentage = 0;
+  res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('[0Q Active]'), 'Expected [0Q Active] for Orchestrator (Neon) when gemini-weekly is 0%');
+});
+
+// 24. Orchestrator (Argon) Badges & gemini-argon-wtu-weekly Quota Binding
+runTest('Engine: Orchestrator (Argon) renders Orchestrator (Argon) / Orch(A) badges and binds to gemini-argon-wtu-weekly', () => {
+  const payloadStr = fs.readFileSync(fixturePayloadPath, 'utf8');
+  const payload = JSON.parse(payloadStr);
+  payload.model = {
+    id: 'gemini-pro-orchestrator-g1-pro',
+    display_name: 'Orchestrator (Argon)'
+  };
+  payload.rate_limits = {
+    'gemini-5h': { remaining_percentage: 95, reset_in_seconds: 18000 },
+    'gemini-argon-wtu-weekly': { remaining_percentage: 55, reset_in_seconds: 182700 },
+    'gemini-weekly': { remaining_percentage: 100, reset_in_seconds: 604800 }
+  };
+  delete payload.quota;
+  payload.credits = 2000;
+
+  const testQuotaCache = path.join(tempTestDir, 'test_orch_argon_last_quota.json');
+  const envWithQuotaFile = Object.assign({}, env, { HUD_TEST_QUOTA_FILE: testQuotaCache });
+
+  // 24a. Full mode
+  const fullCfg = JSON.parse(fs.readFileSync(fixtureCfgPath, 'utf8'));
+  fullCfg.item_styles = Object.assign({}, fullCfg.item_styles, { model: 'full' });
+  fs.writeFileSync(testConfigPath, JSON.stringify(fullCfg, null, 2), 'utf8');
+  let res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  assert.strictEqual(res.status, 0);
+  let clean = stripAnsi(res.stdout);
+  assert(clean.includes('Orchestrator (Argon)'), `Expected full Orchestrator (Argon) badge, got: ${clean}`);
+  assert(clean.includes('Wk(A): 55% / Wk(G): 100%'), `Expected dual Wk(A)/Wk(G) segment, got: ${clean}`);
+  const cachedQuota = JSON.parse(fs.readFileSync(testQuotaCache, 'utf8'));
+  assert.strictEqual(cachedQuota.qWkPercent, 55);
+
+  // 24b. Short mode -> Orch(A) │
+  const shortCfg = JSON.parse(fs.readFileSync(fixtureCfgPath, 'utf8'));
+  shortCfg.item_styles = Object.assign({}, shortCfg.item_styles, { model: 'short' });
+  fs.writeFileSync(testConfigPath, JSON.stringify(shortCfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('Orch(A) │'), `Expected short Orch(A) badge, got: ${clean}`);
+
+  // 24c. Minimal mode -> Orch(A) │
+  const minCfg = JSON.parse(fs.readFileSync(fixtureCfgPath, 'utf8'));
+  minCfg.item_styles = Object.assign({}, minCfg.item_styles, { model: 'minimal' });
+  fs.writeFileSync(testConfigPath, JSON.stringify(minCfg, null, 2), 'utf8');
+  res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('Orch(A) │'), `Expected minimal Orch(A) badge, got: ${clean}`);
+
+  // 24d. Active-model 0Q binds to gemini-argon-wtu-weekly
+  fs.copyFileSync(fixtureCfgPath, testConfigPath);
+  payload.rate_limits['gemini-argon-wtu-weekly'].remaining_percentage = 55;
+  payload.rate_limits['gemini-weekly'].remaining_percentage = 0;
+  res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  clean = stripAnsi(res.stdout);
+  assert(!clean.includes('[0Q Active]'), 'Should NOT trigger [0Q Active] for Orchestrator (Argon) when only gemini-weekly is 0%');
+
+  payload.rate_limits['gemini-argon-wtu-weekly'].remaining_percentage = 0;
+  payload.rate_limits['gemini-weekly'].remaining_percentage = 100;
+  res = spawnSync('node', [hudScriptPath], {
+    input: JSON.stringify(payload),
+    env: envWithQuotaFile,
+    encoding: 'utf8'
+  });
+  clean = stripAnsi(res.stdout);
+  assert(clean.includes('[0Q Active]'), 'Expected [0Q Active] for Orchestrator (Argon) when gemini-argon-wtu-weekly is 0%');
 });
 
 // Cleanup test scratch
