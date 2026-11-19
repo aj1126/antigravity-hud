@@ -94,7 +94,7 @@ Antigravity HUD includes 4 local, zero-token lifecycle hooks deployed in `~/.gem
 
 1. **`post_tool_format.js`**: Automatically formats edited files via local Prettier / ast-grep and strips harmful UTF-8 BOM preambles with 0 LLM token cost.
 2. **`on_session_start.ps1`**: Silent pre-flight sanity check and `.workspace_context/resume-points/` auto-discovery.
-3. **`pre_tool_guard.js`**: Intercepts destructive git commands (`git reset --hard`, `git push --force`, `rm -rf`) and cross-agent `claude*` CLI invocations while allowing read-only `.claude` path inspection, and monitors 5h/weekly (`Wk(A)`/`Wk(G)`) quota exhaustion (< 15%).
+3. **`pre_tool_guard.js`**: Intercepts destructive git commands (`git reset --hard`, `git push --force`, `rm -rf`), cross-agent `claude*` CLI invocations (including `npx @anthropic-ai/claude-code` and `node .../@anthropic-ai/claude-code/cli.js`), and unratified writes to protected `~/.gemini` paths (`evaluateTargetPath`) across CLI argv and PreToolUse stdin JSON payloads (`{"decision":"allow"|"deny"}`), while allowing read-only `.claude` inspection and monitoring 5h/weekly (`Wk(A)`/`Wk(G)`) quota exhaustion (< 15%).
 4. **`on_session_exit.ps1`**: Detached background quad-sync worker that creates session resume points, quad-syncs devlogs, triggers git commits, and delivers native Windows 11 Toast notifications after console closure.
 
 ---

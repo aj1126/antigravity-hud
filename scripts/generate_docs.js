@@ -472,9 +472,9 @@ const LIFECYCLE_HOOKS = [
     name: 'pre_tool_guard.js',
     path: 'hooks/pre_tool_guard.js',
     trigger: 'Executed prior to subshell tool execution',
-    purpose: 'Zero-quota local AST and regex guardrail that blocks destructive shell commands (`git reset --hard`, `git push --force`, `rm -rf`) and cross-agent `claude*` CLI invocations (`claude`, `claude2`, `claude3`, `claude.exe`, `Start-Process ... claude`) while allowing read-only `.claude` path inspection, and warns on 5h/weekly (`Wk(A)`/`Wk(G)`) quota exhaustion (< 15%).',
-    args: '<command-string>',
-    exitCodes: '0 (Safe), 1 (Blocked destructive or cross-agent CLI command)'
+    purpose: 'Zero-quota local AST and regex guardrail that blocks destructive shell commands (`git reset --hard`, `git push --force`, `rm -rf`), cross-agent `claude*` CLI invocations (`claude`, `claude2`, `claude3`, `claude.exe`, `Start-Process ... claude`, `npx @anthropic-ai/claude-code`, `node .../@anthropic-ai/claude-code/cli.js`), and unratified writes to protected `~/.gemini` paths (`evaluateTargetPath`) across both CLI argv and stdin JSON hook payloads (`{ decision: "allow" | "deny" }`), while allowing read-only `.claude` path inspection and warning on 5h/weekly (`Wk(A)`/`Wk(G)`) quota exhaustion (< 15%).',
+    args: '<command-string> | stdin JSON payload',
+    exitCodes: '0 (Safe or JSON decision emitted), 1 (Blocked via CLI argv)'
   },
   {
     name: 'post_tool_format.js',
@@ -703,7 +703,9 @@ ${LIFECYCLE_HOOKS.map(h => `| **\`${h.name}\`** | ${h.trigger} | ${h.purpose} | 
 ### 3. \`hooks/pre_tool_guard.js\`
 * **Execution Trigger:** Pre-tool invocation.
 * **Operations:**
-  - Blocks high-risk destructive commands (\`git reset --hard\`, \`git push --force\`, \`rm -rf\`, \`drop database\`) and cross-agent \`claude*\` CLI invocations (\`claude\`, \`claude2\`, \`claude3\`, \`claude.exe\`, \`Start-Process ... claude\`) while allowing non-executing \`.claude\` file reads.
+  - Supports both direct CLI argument checks (exit \`0\`/\`1\`) and PreToolUse stdin JSON hook payloads (\`{ "decision": "allow" | "deny" }\`).
+  - Blocks high-risk destructive commands (\`git reset --hard\`, \`git push --force\`, \`rm -rf\`, \`drop database\`) and cross-agent \`claude*\` CLI invocations (\`claude\`, \`claude2\`, \`claude3\`, \`claude.exe\`, \`Start-Process ... claude\`, \`npx @anthropic-ai/claude-code\`, \`node .../@anthropic-ai/claude-code/cli.js\`) while allowing non-executing \`.claude\` file reads.
+  - Protects live Antigravity rules, \`mcp_config.json\`, and \`GEMINI.md\` via \`evaluateTargetPath\` (bypassed only when \`AGY_RATIFY_ACTIVE=1\`).
   - Evaluates remaining 5-hour rolling and weekly (\`Wk(A)\` / \`Wk(G)\`) quotas from \`~/.gemini/tmp/last_quota.json\`.
   - Emits advisory warning when 5h or weekly quota drops below 15% (\`Quota Low\` / \`Weekly Quota Low\`).
 
